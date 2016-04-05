@@ -13,8 +13,8 @@ Existing templating systems do support things like logic and reusable modules - 
 ```py
 import html
 print (
-    html.head().appendChild(
-        html.body().appendChild(
+    html.head().append_children(
+        html.body().append_children(
                 html.text("Hello World!"))))
 ```
 
@@ -149,32 +149,32 @@ UI Modules are especially useful for creating re-usable building blocks in your 
 
 Creating UI modules in Pyxl simply means creating a class that inherits from [`x_element`](https://github.com/dropboxe/pyxl/blob/master/pyxl/pyxl/element.py) and implements the `render()` method. Modules must be prefixed with `x_`. This is an arbitrary requirement, but is useful in separating out pyxl modules from other things.
 
-Arguments to a UI module are passed as attributes to the UI module tag. Attribute values for these tags need not evaluate to samething that can be cast to unicode, ONLY if the attribute value is a single python expression i.e. the only thing inside the quotes is a {} wrapped python expression. This allows one to pass in any type to a UI module. To demonstrate, a useful UI module is a user badge, which displays a user profile picture with the user's name and some arbitrary content to the right of it:
+Arguments to a UI module are passed as attributes to the UI module tag. Attribute values for these tags need not evaluate to something that can be cast to unicode, ONLY if the attribute value is a single python expression i.e. the only thing inside the quotes is a {} wrapped python expression. This allows one to pass in any type to a UI module. To demonstrate, a useful UI module is a user badge, which displays a user profile picture with the user's name and some arbitrary content to the right of it:
 
 ```py
 # coding: pyxl
 from pyxl.element import x_element
+from my.db.model import User
 
 class x_user_badge(x_element):
-    __attrs__ = {
-        'user': object,
-    }
-    def render(self):
+
+    def render(self, user: User):
         return (
             <div>
-                <img src="{self.user.profile_picture}" style="float: left; margin-right: 10px;"/>
+                <img src="{user.profile_picture}" style="float: left; margin-right: 10px;"/>
                 <div style="display: table-cell;">
-                    <div>{self.user.name}</div>
+                    <div>{user.name}</div>
                     {self.children()}
                 </div>
             </div>)
 ```
 
-This makes the tag `<user_badge>` available to us which accepts `user` as an attribute which is an object that contains the user's name and profile picture. Here is an example of this new UI module being used.
+This makes the tag `<user_badge>` available to us which accepts `user` as an attribute which is of `User` type and contains the user's name and profile picture. Here is an example of this new UI module being used.
 
 ```py
 # coding: pyxl
 from some_module import x_user_badge
+from my.db.model import User
 
 user = User.get(some_user_id)
 content = <div>Any arbitrary content...</div>
@@ -184,7 +184,7 @@ print <user_badge user="{user}">{content}</user_badge>
 Some things to note about UI modules.
 
 * Modules names must begin with `x_` and be an instance of `x_element`
-* Modules must specify the attributes they accept via the `__attrs__` class variable. This is a dictionary where the key is the attribute name, and the value is the attribute type. Passing an attribute that is not listed in `__attrs__` will result in an error. The only exceptions are attributes accepted by all pyxl elements i.e. id, class, style, onclick, title and anything prefixed with "data-" or "aria-"
+* There are two ways to specify attributes to UI Modules. You can either use python3 function annotations to `render()`, or use the `__attrs__` class variable. Both consists of keys and values in their own way. The key is the attribute name, and the value is the attribute type. Passing an attribute that is not listed in `__attrs__` or `render()` signature will result in an error. The only exceptions are attributes accepted by all pyxl elements i.e. id, class, style, onclick, title and anything prefixed with "data-" or "aria-".
 * Providing a `class` attribute for a UI module element will automatically append the class string to the underlying HTML element the UI module renders. This is useful when you want to style UI modules differently based on where it is being rendered.
 
 ### Fragments

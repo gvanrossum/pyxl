@@ -8,7 +8,7 @@ In the ATTRIBUTE_VALUE and BEFORE_ATTRIBUTE_VALUE states, python tokens are acce
 import sys
 from collections import OrderedDict
 
-class State(object):
+class State:
     DATA = 1
     # unused states: charrefs, RCDATA, script, RAWTEXT, PLAINTEXT
     TAG_OPEN = 7
@@ -45,7 +45,7 @@ class State(object):
                 return k
         assert False, "impossible state value %r!" % state_val
 
-class Tag(object):
+class Tag:
     def __init__(self):
         self.tag_name = None
         self.attrs = OrderedDict()
@@ -63,7 +63,7 @@ class BadCharError(Exception):
 class Unimplemented(Exception):
     pass
 
-class HTMLTokenizer(object):
+class HTMLTokenizer:
 
     def __init__(self):
         self.state = State.DATA

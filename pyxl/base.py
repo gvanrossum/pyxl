@@ -6,6 +6,7 @@
 # much faster (2x). We're also not using NumPy (which is even faster) because
 # it's a difficult dependency to fulfill purely to generate random numbers.
 import random
+import inspect
 import sys
 
 from pyxl.utils import escape
@@ -15,7 +16,7 @@ class PyxlException(Exception):
 
 class x_base_metaclass(type):
     def __init__(self, name, parents, attrs):
-        super(x_base_metaclass, self).__init__(name, parents, attrs)
+        super().__init__(name, parents, attrs)
         x_base_parents = [parent for parent in parents if hasattr(parent, '__attrs__')]
         parent_attrs = x_base_parents[0].__attrs__ if len(x_base_parents) else {}
         self_attrs = self.__dict__.get('__attrs__', {})
@@ -25,12 +26,27 @@ class x_base_metaclass(type):
             assert '_' not in attr_name, (
                 "%s: '_' not allowed in attr names, use '-' instead" % attr_name)
 
+        if hasattr(self, 'render'):
+            argspec = inspect.getfullargspec(self.render)
+            if argspec.kwonlyargs:
+                raise PyxlException('Keyword-only arguments are not supported in render() signature')
+            if argspec.defaults:
+                raise PyxlException('"%s" cannot have a default value. If you need such behaviour, '\
+                                    'annotate the parameter with a list, which is interpreted as an enum' % argspec.defaults[0])
+            self._render_params = [x.replace('_', '-') for x in argspec.args[1:]]
+            for arg in self._render_params:
+                if arg in self_attrs:
+                    raise PyxlException('attr "%s" is defined both in __attrs__ and as a render parameter' % arg)
+            attrs = dict.fromkeys(self._render_params, object)
+            attrs.update(argspec.annotations)
+            self_attrs.update(attrs)
+
         combined_attrs = dict(parent_attrs)
         combined_attrs.update(self_attrs)
         setattr(self, '__attrs__', combined_attrs)
         setattr(self, '__tag__', name[2:])
 
-class x_base(object, metaclass=x_base_metaclass):
+class x_base(metaclass=x_base_metaclass):
 
     __attrs__ = {
         # HTML attributes

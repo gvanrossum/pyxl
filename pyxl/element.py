@@ -32,7 +32,8 @@ class x_element(x_base):
     def _rendered_element(self):
         if self._element is None:
             self.prerender()
-            self._element = self.render()
+            attrs = {key.replace('-', '_'): getattr(self, key) for key in self._render_params}
+            self._element = self.render(**attrs)
             self.postrender(self._element)
         return self._element
 

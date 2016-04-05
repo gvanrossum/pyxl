@@ -18,7 +18,7 @@ def get_end_pos(start_pos, tvalue):
             col += 1
     return (row, col)
 
-class RewindableTokenStream(object):
+class RewindableTokenStream:
     """
     A token stream, with the ability to rewind and restart tokenization while maintaining correct
     token position information.

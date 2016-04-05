@@ -2,6 +2,7 @@
 import unittest2
 from pyxl import html
 from pyxl.base import PyxlException, x_base
+from pyxl.element import x_element
 
 class PyxlTests(unittest2.TestCase):
 
@@ -85,6 +86,61 @@ class PyxlTests(unittest2.TestCase):
                 pass
 
         self.assertEqual(<baz />.value, None)
+
+    def test_render_args_are_added_to_pyxl_attributes(self):
+
+        class x_foo(x_element):
+            def render(self, value: int):
+                return <span>{value}</span>
+
+        self.assertEqual(<foo />.value, None)
+        self.assertEqual(<foo value="10" />.value, 10)
+        with self.assertRaises(PyxlException):
+            <foo value="boo" />.value
+
+        self.assertEqual(<foo value="11" />.to_string(), '<span>11</span>') 
+
+    def test_render_arg_supports_enum(self):
+
+        class x_foo(x_element):
+            def render(self, value: ['a', 'b']):
+                return <span>{value}</span>
+
+        self.assertEqual(<foo />.value, 'a')
+        self.assertEqual(<foo value="b" />.value, 'b')
+        with self.assertRaises(PyxlException):
+            <foo value="c" />.value
+
+    def test_render_arg_without_annotation(self):
+
+        class x_foo(x_element):
+            def render(self, value):
+                return <span>{value}</span>
+
+        self.assertEqual(<foo />.to_string(), '<span></span>')
+        self.assertEqual(<foo value="123" />.to_string(), '<span>123</span>')
+        self.assertEqual(<foo value="boo" />.to_string(), '<span>boo</span>')
+
+    def test_underscore_in_render_arg(self):
+
+        class x_foo(x_element):
+            def render(self, a_b_c: int):
+                return <span>{a_b_c}</span>
+
+        self.assertEqual(<foo a_b_c="1" />.to_string(), '<span>1</span>')
+
+    def test_attr_collision(self):
+
+        with self.assertRaises(PyxlException):
+
+            class x_foo(x_element):
+
+                __attrs__ = {
+                    'laughing': object
+                }
+
+                def render(self, laughing):
+                    pass
 
 if __name__ == '__main__':
     unittest2.main()
