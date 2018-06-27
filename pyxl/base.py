@@ -103,7 +103,7 @@ class x_base(object, metaclass=x_base_metaclass):
 
         # filter by class
         if selector[0] == '.':
-            select = lambda x: selector[1:] in x.get_class() 
+            select = lambda x: selector[1:] in x.get_class()
 
         # filter by id
         elif selector[0] == '#':
@@ -230,9 +230,6 @@ class x_base(object, metaclass=x_base_metaclass):
         raise NotImplementedError()
 
     def __str__(self):
-        return self.to_string()
-
-    def __unicode__(self):
         return self.to_string()
 
     @staticmethod
