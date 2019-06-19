@@ -28,14 +28,12 @@ class PyxlParser(HTMLTokenizer):
         self.last_thing_was_close_if_tag = False
 
     def delete_last_comma(self):
-        i = len(self.output) - 1
-        while i >= 0:
+        for i in reversed(range(len(self.output))):
             stripped = self.output[i].rstrip()
             if stripped and not stripped[0] == '#':
                 assert stripped[-1] == ',', (self.output, stripped, i)
                 self.output[i] = self.output[i][:len(stripped)-1] + self.output[i][len(stripped):]
                 return
-            i -= 1
         assert False, "couldn't find a comma"
 
     def handle_close_if(self):
