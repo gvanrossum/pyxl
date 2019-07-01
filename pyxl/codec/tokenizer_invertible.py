@@ -358,8 +358,6 @@ def reverse_tokens(tokens):
             break
 
         ttype, tvalue, tstart, tend, tline = token
-        #print(token)
-
 
         if ttype == tokenize.NAME and tvalue == 'html' and len(saved_tokens) == 0:
             saved_tokens.append(token)
@@ -424,42 +422,6 @@ def reverse_tokens(tokens):
         elif in_pyxl:
             current_buffer_stack[-1].append(token)
             continue
-
-        # if ttype not in (tokenize.INDENT,
-        #                  tokenize.DEDENT,
-        #                  tokenize.NL,
-        #                  tokenize.NEWLINE,
-        #                  tokenize.COMMENT):
-        #     last_nw_token = token
-
-        # # strip trailing newline from non newline tokens
-        # if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
-        #     ltoken = list(token)
-        #     tvalue = ltoken[1] = tvalue[:-1]
-        #     token = tuple(ltoken)
-
-        # # tokenize has this bug where you can get line jumps without a newline token
-        # # we check and fix for that here by seeing if there was a line jump
-        # if prev_token:
-        #     prev_ttype, prev_tvalue, prev_tstart, prev_tend, prev_tline = prev_token
-
-        #     prev_row, prev_col = prev_tend
-        #     cur_row, cur_col = tstart
-
-        #     # check for a line jump without a newline token
-        #     if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
-
-        #         # tokenize also forgets \ continuations :(
-        #         prev_line = prev_tline.strip()
-        #         if prev_ttype != tokenize.COMMENT and prev_line and prev_line[-1] == '\\':
-        #             start_pos = (prev_row, prev_col)
-        #             end_pos = (prev_row, prev_col+1)
-        #             yield (tokenize.STRING, ' \\', start_pos, end_pos, prev_tline)
-        #             prev_col += 1
-
-        #         start_pos = (prev_row, prev_col)
-        #         end_pos = (prev_row, prev_col+1)
-        #         yield (tokenize.NL, '\n', start_pos, end_pos, prev_tline)
 
         prev_token = token
         yield token
