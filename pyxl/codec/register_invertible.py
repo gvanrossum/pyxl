@@ -5,7 +5,10 @@ import codecs, io, encodings
 import sys
 import traceback
 from encodings import utf_8
-from pyxl.codec.tokenizer_invertible import pyxl_reverse_tokenize, pyxl_tokenize, pyxl_untokenize
+from pyxl.codec.tokenizer_invertible import (
+    pyxl_reverse_tokenize, pyxl_tokenize, pyxl_untokenize,
+    PyxlUnfinished,
+)
 
 def pyxl_transform(stream):
     try:
@@ -15,17 +18,19 @@ def pyxl_transform(stream):
         traceback.print_exc()
         raise
 
-    return output.rstrip()
+    return output
 
 def pyxl_reverse(stream):
     try:
         output = pyxl_untokenize(pyxl_reverse_tokenize(stream.readline))
+    except PyxlUnfinished:
+        raise
     except Exception as ex:
         print(ex)
         traceback.print_exc()
         raise
 
-    return output.rstrip()
+    return output.encode('utf-8')
 
 def pyxl_transform_string(input):
     stream = io.StringIO(bytes(input).decode('utf-8'))
@@ -36,7 +41,12 @@ def pyxl_reverse_string(input):
     return pyxl_reverse(stream)
 
 def pyxl_encode(input, errors='strict'):
-    return pyxl_reverse_string(input), len(input)
+    # FIXME: maybe we should actually be able to consume partial results
+    # instead of this O(n^2) retry thing?
+    try:
+        return pyxl_reverse_string(input), len(input)
+    except PyxlUnfinished:
+        return b'', 0
 
 def pyxl_decode(input, errors='strict'):
     return pyxl_transform_string(input), len(input)
@@ -52,16 +62,9 @@ class PyxlIncrementalDecoder(utf_8.IncrementalDecoder):
         else:
             return ''
 
-class PyxlIncrementalEncoder(utf_8.IncrementalEncoder):
-    def encode(self, input, final=False):
-        self.buffer += input
-        if final:
-            buff = self.buffer
-            self.buffer = u''
-            return super(PyxlIncrementalEncoder, self).encode(
-                pyxl_reverse_string(buff), final=True)
-        else:
-            return b''
+class PyxlIncrementalEncoder(codecs.BufferedIncrementalEncoder):
+    def _buffer_encode(self, input, errors, final):
+        return pyxl_encode(input, errors)
 
 
 class PyxlStreamReader(utf_8.StreamReader):
@@ -70,10 +73,8 @@ class PyxlStreamReader(utf_8.StreamReader):
         self.stream = io.StringIO(pyxl_transform(self.stream))
 
 
-class PyxlStreamWriter(utf_8.StreamWriter):
-    def __init__(self, *args, **kwargs):
-        codecs.StreamReader.__init__(self, *args, **kwargs)
-        self.stream = io.StringIO(pyxl_reverse(self.stream))
+class PyxlStreamWriter(codecs.StreamWriter):
+    encode = pyxl_encode
 
 def search_function(encoding):
     if encoding != 'pyxl': return None
@@ -86,10 +87,12 @@ def search_function(encoding):
         incrementalencoder = PyxlIncrementalEncoder,
         incrementaldecoder = PyxlIncrementalDecoder,
         streamreader = PyxlStreamReader,
-        streamwriter = utf8.streamwriter)
+        streamwriter = PyxlStreamWriter,
+    )
 
 
-codecs.register(search_function)
+# This import will do the actual registration with codecs
+import pyxl.codec.fast_register_invertible
 
 if __name__ == '__main__':
     if sys.argv[1] == '-r':
@@ -101,6 +104,6 @@ if __name__ == '__main__':
     with open(fname, 'rb') as f:
         contents = f.read()
         if invert:
-            print(pyxl_reverse_string(contents.decode('utf-8')))
+            print(pyxl_reverse_string(contents.decode('utf-8')).decode('utf-8'), end='')
         else:
-            print(pyxl_transform_string(contents))
+            print(pyxl_transform_string(contents), end='')

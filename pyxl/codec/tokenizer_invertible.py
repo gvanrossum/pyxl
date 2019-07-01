@@ -6,6 +6,8 @@ from io import StringIO
 from pyxl.codec.parser import PyxlParser
 from .pytokenize import Untokenizer
 
+class PyxlUnfinished(Exception): pass
+
 class PyxlParseError(Exception): pass
 
 def get_end_pos(start_pos, tvalue):
@@ -352,6 +354,8 @@ def reverse_tokens(tokens):
         try:
             token = next(tokens)
         except (StopIteration, tokenize.TokenError):
+            if in_pyxl:
+                raise PyxlUnfinished
             break
 
         ttype, tvalue, tstart, tend, tline = token
