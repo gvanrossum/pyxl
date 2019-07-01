@@ -5,6 +5,7 @@ import re
 from io import StringIO
 from pyxl.codec.parser import PyxlParser
 from .pytokenize import Untokenizer
+import ast
 
 class PyxlUnfinished(Exception): pass
 
@@ -281,7 +282,7 @@ def get_pyxl_token(start_token, tokens):
             seen[-1] = (last[0], last[1][:-len(remainder[1])], last[2], remainder[2], last[4])
 
     output = "html.PYXL('''{}''', {})".format(
-        Untokenizer().untokenize(seen),
+        Untokenizer().untokenize(seen).replace('\\', '\\\\').replace("'", "\\'"),
         ', '.join([Untokenizer().untokenize(x) for x in python_stuff]))
     return (tokenize.STRING, output, pyxl_parser.start, pyxl_parser.end, '')
 
@@ -396,11 +397,11 @@ def reverse_tokens(tokens):
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                args = [Untokenizer().untokenize(x).strip('\n') for x in arg_buffers[1:]]
+                args = [Untokenizer().untokenize(x).strip() for x in arg_buffers[1:]]
 
                 # XXX escaping {s??
                 fmt_token = arg_buffers[0][0]
-                fmt = Untokenizer().untokenize(arg_buffers[0]).strip()[3:-3]
+                fmt = ast.literal_eval(Untokenizer().untokenize(arg_buffers[0]).strip())
 
                 # print("CLOSED\n|{}|".format(fmt.format(*args)))
                 pyxl_start = in_pyxl.pop()
