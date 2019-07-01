@@ -345,11 +345,10 @@ def reverse_tokens(tokens):
 
     curly_depth = 0
 
-    in_pyxl = False
-    start_depth = 0
-    arg_buffers = []
-    current_buffer = []
-    pyxl_start = None
+    in_pyxl = []
+    start_depth = []
+    arg_buffers_stack = []
+    current_buffer_stack = []
 
 
     while 1:
@@ -372,25 +371,32 @@ def reverse_tokens(tokens):
             saved_tokens.append(token)
             continue
         if ttype == tokenize.OP and tvalue == '(' and len(saved_tokens) == 3:
-            start_depth = curly_depth
+            start_depth.append(curly_depth)
             curly_depth += 1
-            in_pyxl = True
-            pyxl_start = saved_tokens[0][2]
+            in_pyxl.append(saved_tokens[0][2])
             saved_tokens = []
+            current_buffer_stack.append([])
+            arg_buffers_stack.append([])
 
             continue
         else:
-            yield from saved_tokens
+            if in_pyxl:
+                current_buffer_stack[-1].extend(saved_tokens)
+            else:
+                yield from saved_tokens
             saved_tokens = []
 
         if ttype == tokenize.OP and tvalue in '{([':
             curly_depth += 1
         if ttype == tokenize.OP and tvalue in '})]':
             curly_depth -= 1
-            if in_pyxl and curly_depth == start_depth:
-                if current_buffer:
-                    arg_buffers.append(current_buffer)
-                    current_buffer = []
+            if in_pyxl and curly_depth == start_depth[-1]:
+                arg_buffers = arg_buffers_stack.pop()
+                if current_buffer_stack[-1]:
+                    arg_buffers.append(current_buffer_stack[-1])
+                current_buffer_stack.pop()
+                start_depth.pop()
+
                 args = ['{%s}' % Untokenizer().untokenize(x) for x in arg_buffers[1:]]
 
                 # XXX escaping {s??
@@ -398,21 +404,25 @@ def reverse_tokens(tokens):
                 fmt = fmt_token[1][3:-3]
 
                 #print("CLOSED\n|{}|".format(fmt.format(*args)))
-                in_pyxl = False
-                arg_buffers = []
+                pyxl_start = in_pyxl.pop()
 
-                yield (tokenize.STRING, fmt.format(*args), pyxl_start, tend, '')
+                token = (tokenize.STRING, fmt.format(*args), pyxl_start, tend, '')
+
+                if in_pyxl:
+                    current_buffer_stack[-1].append(token)
+                else:
+                    yield token
                 continue
             if curly_depth < 0:
                 tokens.unshift(token)
                 return
 
-        if in_pyxl and ttype == tokenize.OP and tvalue == ',' and curly_depth == start_depth + 1:
-            arg_buffers.append(current_buffer)
-            current_buffer = []
+        if in_pyxl and ttype == tokenize.OP and tvalue == ',' and curly_depth == start_depth[-1] + 1:
+            arg_buffers_stack[-1].append(current_buffer_stack[-1])
+            current_buffer_stack[-1] = []
             continue
         elif in_pyxl:
-            current_buffer.append(token)
+            current_buffer_stack[-1].append(token)
             continue
 
         # if ttype not in (tokenize.INDENT,
