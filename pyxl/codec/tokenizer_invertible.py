@@ -396,13 +396,13 @@ def reverse_tokens(tokens):
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                args = [Untokenizer().untokenize(x) for x in arg_buffers[1:]]
+                args = [Untokenizer().untokenize(x).strip('\n') for x in arg_buffers[1:]]
 
                 # XXX escaping {s??
                 fmt_token = arg_buffers[0][0]
-                fmt = fmt_token[1][3:-3]
+                fmt = Untokenizer().untokenize(arg_buffers[0]).strip()[3:-3]
 
-                #print("CLOSED\n|{}|".format(fmt.format(*args)))
+                # print("CLOSED\n|{}|".format(fmt.format(*args)))
                 pyxl_start = in_pyxl.pop()
 
                 token = (tokenize.STRING, fmt.format(*args), pyxl_start, tend, '')
