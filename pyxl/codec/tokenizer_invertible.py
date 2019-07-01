@@ -217,10 +217,7 @@ def get_pyxl_token(start_token, tokens):
 
         if tvalue and tvalue[0] == '{':
             if pyxl_parser.python_mode_allowed():
-#                print("F THIS", tvalue)
-                real_end = (tstart[0], 10000) # XXX: peek at the next token to figure this out
-#                print(tstart, tend)
-                seen.append((ttype, '{}', tstart, real_end, ''))
+                initial_tstart = tstart
 
                 mid, right = tvalue[0], tvalue[1:]
                 division = get_end_pos(tstart, mid)
@@ -232,6 +229,8 @@ def get_pyxl_token(start_token, tokens):
                 # seen.append(close_curly)
                 ttype, tvalue, tstart, tend, tline = close_curly
                 close_curly_sub = (ttype, '', tend, tend, tline)
+
+                seen.append((ttype, '{{{}}}', initial_tstart, tend, ''))
 
                 pyxl_parser.feed_python(python_tokens + [close_curly_sub])
                 python_stuff.append(python_tokens + [close_curly_sub])
@@ -339,8 +338,6 @@ def cleanup_tokens(tokens):
 
 
 def reverse_tokens(tokens):
-    last_nw_token = None
-    prev_token = None
     saved_tokens = []
 
     curly_depth = 0
@@ -395,7 +392,7 @@ def reverse_tokens(tokens):
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                args = ['{%s}' % Untokenizer().untokenize(x) for x in arg_buffers[1:]]
+                args = [Untokenizer().untokenize(x) for x in arg_buffers[1:]]
 
                 # XXX escaping {s??
                 fmt_token = arg_buffers[0][0]
