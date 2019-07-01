@@ -87,6 +87,8 @@ class PyxlParser(HTMLTokenizer):
     def feed_python(self, tokens):
         self.handle_close_if()
 
+        # print("FEED", tokens)
+
         ttype, tvalue, tstart, tend, tline = tokens[0]
         assert tstart[0] >= self.end[0], "row went backwards"
         if tstart[0] > self.end[0]:
