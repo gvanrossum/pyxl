@@ -102,7 +102,6 @@ def pyxl_untokenize(tokens):
     prev_col = 0
 
     for token in tokens:
-#        print(token)
         ttype, tvalue, tstart, tend, tline = token
         row, col = tstart
 
@@ -127,7 +126,7 @@ def pyxl_tokenize(readline):
     return transform_tokens(RewindableTokenStream(readline))
 
 def pyxl_reverse_tokenize(readline):
-    return reverse_tokens(RewindableTokenStream(readline))
+    return cleanup_tokens(reverse_tokens(RewindableTokenStream(readline)))
 
 def transform_tokens(tokens):
     last_nw_token = None
@@ -275,7 +274,10 @@ def get_pyxl_token(start_token, tokens):
     remainder = pyxl_parser.get_remainder()
     if remainder:
         tokens.rewind_and_retokenize(remainder)
-
+        # Strip the remainder out from the last seen token
+        if remainder[1]:
+            last = seen[-1]
+            seen[-1] = (last[0], last[1][:-len(remainder[1])], last[2], remainder[2], last[4])
 
     output = "html.PYXL('''{}''', {})".format(
         Untokenizer().untokenize(seen),
@@ -284,18 +286,9 @@ def get_pyxl_token(start_token, tokens):
 
     # return pyxl_parser.get_token()
 
-def reverse_tokens(tokens):
+def cleanup_tokens(tokens):
     last_nw_token = None
     prev_token = None
-    saved_tokens = []
-
-    curly_depth = 0
-
-    in_pyxl = False
-    start_depth = 0
-    arg_buffers = []
-    current_buffer = []
-
 
     while 1:
         try:
@@ -304,62 +297,6 @@ def reverse_tokens(tokens):
             break
 
         ttype, tvalue, tstart, tend, tline = token
-        #print(token)
-
-
-        if ttype == tokenize.NAME and tvalue == 'html' and len(saved_tokens) == 0:
-            saved_tokens.append(token)
-            continue
-        elif ttype == tokenize.OP and tvalue == '.' and len(saved_tokens) == 1:
-            saved_tokens.append(token)
-            continue
-        elif ttype == tokenize.NAME and tvalue == 'PYXL' and len(saved_tokens) == 2:
-            saved_tokens.append(token)
-            continue
-        if ttype == tokenize.OP and tvalue == '(' and len(saved_tokens) == 3:
-            print("GOT HERE")
-            start_depth = curly_depth
-            curly_depth += 1
-            in_pyxl = True
-            yield from saved_tokens
-            saved_tokens = []
-
-            yield token
-            continue
-        else:
-            yield from saved_tokens
-            saved_tokens = []
-
-        if ttype == tokenize.OP and tvalue in '{([':
-            curly_depth += 1
-        if ttype == tokenize.OP and tvalue in '})]':
-            curly_depth -= 1
-            if in_pyxl and curly_depth == start_depth:
-                if current_buffer:
-                    arg_buffers.append(current_buffer)
-                    current_buffer = []
-                args = [Untokenizer().untokenize(x) for x in arg_buffers[1:]]
-                print(arg_buffers[0])
-                print(len(arg_buffers[0]))
-
-                # XXX escaping {s??
-                fmt_token = arg_buffers[0][0]
-                fmt = fmt_token[1][3:-3]
-
-                # print("CLOSED |{}|".format(', '.join(args)))
-                print("CLOSED\n|{}|".format(fmt.format(*args)))
-                in_pyxl = False
-                arg_buffers = []
-            if curly_depth < 0:
-                tokens.unshift(token)
-                return
-
-        if in_pyxl and ttype == tokenize.OP and tvalue == ',' and curly_depth == start_depth + 1:
-            arg_buffers.append(current_buffer)
-            current_buffer = []
-        elif in_pyxl:
-            current_buffer.append(token)
-
 
         if ttype not in (tokenize.INDENT,
                          tokenize.DEDENT,
@@ -396,6 +333,123 @@ def reverse_tokens(tokens):
                 start_pos = (prev_row, prev_col)
                 end_pos = (prev_row, prev_col+1)
                 yield (tokenize.NL, '\n', start_pos, end_pos, prev_tline)
+
+        prev_token = token
+        yield token
+
+
+def reverse_tokens(tokens):
+    last_nw_token = None
+    prev_token = None
+    saved_tokens = []
+
+    curly_depth = 0
+
+    in_pyxl = False
+    start_depth = 0
+    arg_buffers = []
+    current_buffer = []
+    pyxl_start = None
+
+
+    while 1:
+        try:
+            token = next(tokens)
+        except (StopIteration, tokenize.TokenError):
+            break
+
+        ttype, tvalue, tstart, tend, tline = token
+        #print(token)
+
+
+        if ttype == tokenize.NAME and tvalue == 'html' and len(saved_tokens) == 0:
+            saved_tokens.append(token)
+            continue
+        elif ttype == tokenize.OP and tvalue == '.' and len(saved_tokens) == 1:
+            saved_tokens.append(token)
+            continue
+        elif ttype == tokenize.NAME and tvalue == 'PYXL' and len(saved_tokens) == 2:
+            saved_tokens.append(token)
+            continue
+        if ttype == tokenize.OP and tvalue == '(' and len(saved_tokens) == 3:
+            start_depth = curly_depth
+            curly_depth += 1
+            in_pyxl = True
+            pyxl_start = saved_tokens[0][2]
+            saved_tokens = []
+
+            continue
+        else:
+            yield from saved_tokens
+            saved_tokens = []
+
+        if ttype == tokenize.OP and tvalue in '{([':
+            curly_depth += 1
+        if ttype == tokenize.OP and tvalue in '})]':
+            curly_depth -= 1
+            if in_pyxl and curly_depth == start_depth:
+                if current_buffer:
+                    arg_buffers.append(current_buffer)
+                    current_buffer = []
+                args = ['{%s}' % Untokenizer().untokenize(x) for x in arg_buffers[1:]]
+
+                # XXX escaping {s??
+                fmt_token = arg_buffers[0][0]
+                fmt = fmt_token[1][3:-3]
+
+                #print("CLOSED\n|{}|".format(fmt.format(*args)))
+                in_pyxl = False
+                arg_buffers = []
+
+                yield (tokenize.STRING, fmt.format(*args), pyxl_start, tend, '')
+                continue
+            if curly_depth < 0:
+                tokens.unshift(token)
+                return
+
+        if in_pyxl and ttype == tokenize.OP and tvalue == ',' and curly_depth == start_depth + 1:
+            arg_buffers.append(current_buffer)
+            current_buffer = []
+            continue
+        elif in_pyxl:
+            current_buffer.append(token)
+            continue
+
+        # if ttype not in (tokenize.INDENT,
+        #                  tokenize.DEDENT,
+        #                  tokenize.NL,
+        #                  tokenize.NEWLINE,
+        #                  tokenize.COMMENT):
+        #     last_nw_token = token
+
+        # # strip trailing newline from non newline tokens
+        # if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
+        #     ltoken = list(token)
+        #     tvalue = ltoken[1] = tvalue[:-1]
+        #     token = tuple(ltoken)
+
+        # # tokenize has this bug where you can get line jumps without a newline token
+        # # we check and fix for that here by seeing if there was a line jump
+        # if prev_token:
+        #     prev_ttype, prev_tvalue, prev_tstart, prev_tend, prev_tline = prev_token
+
+        #     prev_row, prev_col = prev_tend
+        #     cur_row, cur_col = tstart
+
+        #     # check for a line jump without a newline token
+        #     if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
+
+        #         # tokenize also forgets \ continuations :(
+        #         prev_line = prev_tline.strip()
+        #         if prev_ttype != tokenize.COMMENT and prev_line and prev_line[-1] == '\\':
+        #             start_pos = (prev_row, prev_col)
+        #             end_pos = (prev_row, prev_col+1)
+        #             yield (tokenize.STRING, ' \\', start_pos, end_pos, prev_tline)
+        #             prev_col += 1
+
+        #         start_pos = (prev_row, prev_col)
+        #         end_pos = (prev_row, prev_col+1)
+        #         yield (tokenize.NL, '\n', start_pos, end_pos, prev_tline)
 
         prev_token = token
         yield token
