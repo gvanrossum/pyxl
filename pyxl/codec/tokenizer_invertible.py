@@ -281,9 +281,11 @@ def get_pyxl_token(start_token, tokens):
             last = seen[-1]
             seen[-1] = (last[0], last[1][:-len(remainder[1])], last[2], remainder[2], last[4])
 
-    output = "html.PYXL('''{}''', {}, {})".format(
+    output = "html.PYXL('''{}''', {}, {}{}{})".format(
         Untokenizer().untokenize(seen).replace('\\', '\\\\').replace("'", "\\'"),
         pyxl_parser.start[1],
+        ', '.join([str(get_start_column(x[0])) for x in python_stuff]), # grab the columns...
+        ', ' if python_stuff else '',
         ', '.join([Untokenizer().untokenize(x) for x in python_stuff]))
     return (tokenize.STRING, output, pyxl_parser.start, pyxl_parser.end, '')
 
@@ -341,13 +343,14 @@ def cleanup_tokens(tokens):
         yield token
 
 
-def try_fixing_indent(s, real_start_col, orig_start_col):
+def try_fixing_indent(s, diff):
     """Given a string, try to fix its internal indentation"""
+    if '\n' not in s:
+        return s
     lines = s.split('\n')
-    if not len(lines) >= 2:
+    if len(lines) < 2:
         return s
     fixed = [lines[0]]
-    diff = real_start_col - orig_start_col
     spacing = " " * abs(diff)
     for line in lines[1:]:
         if diff > 0 and line:
@@ -358,6 +361,30 @@ def try_fixing_indent(s, real_start_col, orig_start_col):
 
     return '\n'.join(fixed)
 
+def untokenize(toks):
+    return Untokenizer().untokenize(toks).strip()
+
+def get_start_column(token):
+    """From a token, get the starting column"""
+    # ttype, tvalue, (tstartrow, tstartcol), tend, tline = token
+    return token[2][1]
+
+def get_end_column(token):
+    """From a token, get the ending column"""
+    # ttype, tvalue, tstart, (tendrow, tendcol), tend, tline = token
+    return token[3][1]
+
+def get_first_non_ws_token(tokens):
+    for token in tokens:
+        if token[0] not in (tokenize.INDENT,
+                            tokenize.DEDENT,
+                            tokenize.NL,
+                            tokenize.NEWLINE):
+            return token
+    # well... let's return *something*
+    return tokens[-1]
+
+
 def reverse_tokens(tokens):
     saved_tokens = []
 
@@ -367,7 +394,6 @@ def reverse_tokens(tokens):
     start_depth = []
     arg_buffers_stack = []
     current_buffer_stack = []
-
 
     while 1:
         try:
@@ -409,26 +435,39 @@ def reverse_tokens(tokens):
         if ttype == tokenize.OP and tvalue in '})]':
             curly_depth -= 1
             if in_pyxl and curly_depth == start_depth[-1]:
+                pyxl_start = in_pyxl.pop()
                 arg_buffers = arg_buffers_stack.pop()
                 if current_buffer_stack[-1]:
                     arg_buffers.append(current_buffer_stack[-1])
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                args = [Untokenizer().untokenize(x).strip() for x in arg_buffers[2:]]
+                pos_and_arg_buffers = arg_buffers[2:]
+                num_args = len(pos_and_arg_buffers)//2
+                orig_pos_buffers = pos_and_arg_buffers[:num_args]
+                real_arg_buffers = pos_and_arg_buffers[num_args:]
+
+                orig_poses = [int(untokenize(x)) for x in orig_pos_buffers]
+                real_poses = [get_start_column(get_first_non_ws_token(x))
+                              for x in real_arg_buffers] # grab the columns...
+                # Shift the indentation position of all of the arguments to the columns
+                # they were at in the original source. (The final pyxl literal will then
+                # be shifted from its original column to its new column.)
+                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
+                        for buf, orig_pos, real_pos
+                        in zip(real_arg_buffers, orig_poses, real_poses)]
 
                 # XXX escaping {s??
                 fmt_token = arg_buffers[0][0]
-                fmt = ast.literal_eval(Untokenizer().untokenize(arg_buffers[0]).strip())
-                orig_start_col = int(Untokenizer().untokenize(arg_buffers[1]).strip())
+                fmt = ast.literal_eval(untokenize(arg_buffers[0]))
+                orig_start_col = int(untokenize(arg_buffers[1]))
 
                 # print("CLOSED\n|{}|".format(fmt.format(*args)))
-                pyxl_start = in_pyxl.pop()
 
                 # format to get the raw pyxl
                 raw_pyxl = fmt.format(*args)
                 # and then try to repair its internal indentation if the start position shifted
-                fixed_pyxl = try_fixing_indent(raw_pyxl, pyxl_start[1], orig_start_col)
+                fixed_pyxl = try_fixing_indent(raw_pyxl, pyxl_start[1] - orig_start_col)
 
                 token = (tokenize.STRING, fixed_pyxl, pyxl_start, tend, '')
 
