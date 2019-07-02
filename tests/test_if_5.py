@@ -10,7 +10,7 @@ def test():
                    <if cond="{foo(True)}">a</if>
                    <else>b</else>
                    {<div>lol{10}</div>}
-               </frag>) == "a1"
+               </frag>) == "a<div>lol10</div>"
 
     count[0] = 0
     assert str(<frag>
@@ -18,4 +18,4 @@ def test():
                    <else>b</else>
                    # asdf
                    {count[0]} whatever {2}
-               </frag>) == "b1"
+               </frag>) == "b1 whatever 2"
