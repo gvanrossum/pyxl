@@ -9,9 +9,12 @@ from collections import namedtuple
 Pos = namedtuple('Pos', ['row', 'col'])
 Token = namedtuple('Token', ['ttype', 'value', 'start', 'end', 'line'])
 
+
 class PyxlUnfinished(Exception): pass
 
+
 class PyxlParseError(Exception): pass
+
 
 def get_end_pos(start_pos, tvalue):
     row, col = start_pos
@@ -22,6 +25,7 @@ def get_end_pos(start_pos, tvalue):
         else:
             col += 1
     return (row, col)
+
 
 class RewindableTokenStream(object):
     """
@@ -101,6 +105,20 @@ class RewindableTokenStream(object):
         stream."""
         self.unshift_buffer[:0] = [token]
 
+
+def untokenize(toks):
+    return Untokenizer().untokenize(toks).strip()
+
+
+def untokenize_with_column(tokens):
+    """Untokenize a series of tokens, with it in its proper column.
+
+    This requires inserting a newline before it.
+    """
+    tok_type, token, start, end, line = tokens[0]
+    return Untokenizer(start[0] - 1, 0).untokenize(tokens)
+
+
 def pyxl_untokenize(tokens):
     parts = []
     prev_row = 1
@@ -127,11 +145,14 @@ def pyxl_untokenize(tokens):
 
     return ''.join(parts)
 
+
 def pyxl_tokenize(readline):
     return transform_tokens(RewindableTokenStream(readline))
 
+
 def pyxl_reverse_tokenize(readline):
     return cleanup_tokens(reverse_tokens(RewindableTokenStream(readline)))
+
 
 def transform_tokens(tokens):
     last_nw_token = None
@@ -168,7 +189,6 @@ def transform_tokens(tokens):
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'yield') or
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'return'))):
             token = get_pyxl_token(token, tokens)
-#            print("PYXL", token)
 
         if ttype not in (tokenize.INDENT,
                          tokenize.DEDENT,
@@ -209,19 +229,20 @@ def transform_tokens(tokens):
         prev_token = token
         yield token
 
+
 def get_pyxl_token(start_token, tokens):
     ttype, tvalue, tstart, tend, tline = start_token
     pyxl_parser = PyxlParser(tstart.row, tstart.col)
     pyxl_parser.feed(start_token)
 
-    seen = [start_token]
-    python_stuff = []
+    pyxl_tokens = [start_token]
+    python_fragments = []
     for token in tokens:
         ttype, tvalue, tstart, tend, tline = token
 
-
         if tvalue and tvalue[0] == '{':
             if pyxl_parser.python_mode_allowed():
+                # We've hit a python fragment
                 initial_tstart = tstart
 
                 mid, right = tvalue[0], tvalue[1:]
@@ -235,14 +256,14 @@ def get_pyxl_token(start_token, tokens):
                 close_curly_sub = Token(ttype, '', tend, tend, tline)
 
                 # Carefully split this up to preserve any whitespace at the edges
-                seen.append(Token(ttype, '{{', initial_tstart, division, ''))
-                seen.append(Token(ttype, '{}',
-                                  first_non_ws_token(python_tokens).start,
-                                  python_tokens[-1].end, ''))
-                seen.append(Token(ttype, '}}', tstart, tend, ''))
+                pyxl_tokens.append(Token(ttype, '{{', initial_tstart, division, ''))
+                pyxl_tokens.append(Token(ttype, '{}',
+                                         first_non_ws_token(python_tokens).start,
+                                         python_tokens[-1].end, ''))
+                pyxl_tokens.append(Token(ttype, '}}', tstart, tend, ''))
 
                 pyxl_parser.feed_python(python_tokens + [close_curly_sub])
-                python_stuff.append(python_tokens + [close_curly_sub])
+                python_fragments.append(python_tokens + [close_curly_sub])
                 continue
             # else fallthrough to pyxl_parser.feed(token)
         elif tvalue and ttype == tokenize.COMMENT:
@@ -253,7 +274,7 @@ def get_pyxl_token(start_token, tokens):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
             else:
-                seen.append(token)
+                pyxl_tokens.append(token)
                 pyxl_parser.feed_comment(token)
                 continue
         elif tvalue and tvalue[0] == '#':
@@ -269,7 +290,7 @@ def get_pyxl_token(start_token, tokens):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
 
-        seen.append(token)
+        pyxl_tokens.append(token)
         pyxl_parser.feed(token)
 
         if pyxl_parser.done(): break
@@ -285,34 +306,25 @@ def get_pyxl_token(start_token, tokens):
         tokens.rewind_and_retokenize(remainder)
         # Strip the remainder out from the last seen token
         if remainder.value:
-            last = seen[-1]
-            seen[-1] = Token(
+            last = pyxl_tokens[-1]
+            pyxl_tokens[-1] = Token(
                 last.ttype, last.value[:-len(remainder[1])],
                 last.start, Pos(*remainder.start), last.line)
 
     pyxl_parser_start = Pos(*pyxl_parser.start)
     output = "html.PYXL('''{}''', {}, {}, {}{}{})".format(
-        Untokenizer().untokenize(seen).replace('\\', '\\\\').replace("'", "\\'"),
+        untokenize(pyxl_tokens).replace('\\', '\\\\').replace("'", "\\'"),
         # Include the real compiled pyxl so that tools can see all the gritty details
         untokenize([pyxl_parser.get_token()]),
         # Include the start column so we can shift it if needed
         pyxl_parser_start.col,
         # Include the columns of each python fragment so we can shift them if needed
-        ', '.join([str(x[0].start.col) for x in python_stuff]),
-        ', ' if python_stuff else '',
+        ', '.join([str(x[0].start.col) for x in python_fragments]),
+        ', ' if python_fragments else '',
         # When untokenizing python fragments, make sure to place them in their
         # proper columns so that we don't detect a shift if there wasn't one.
-        ', '.join([untokenize_with_column(x) for x in python_stuff]))
+        ', '.join([untokenize_with_column(x) for x in python_fragments]))
     return Token(tokenize.STRING, output, pyxl_parser_start, Pos(*pyxl_parser.end), '')
-
-
-def untokenize_with_column(tokens):
-    """Untokenize a series of tokens, with it in its proper column.
-
-    This requires inserting a newline before it.
-    """
-    tok_type, token, start, end, line = tokens[0]
-    return Untokenizer(start[0] - 1, 0).untokenize(tokens)
 
 
 def cleanup_tokens(tokens):
@@ -385,8 +397,6 @@ def try_fixing_indent(s, diff):
 
     return '\n'.join(fixed)
 
-def untokenize(toks):
-    return Untokenizer().untokenize(toks).strip()
 
 def first_non_ws_token(tokens):
     for token in tokens:
