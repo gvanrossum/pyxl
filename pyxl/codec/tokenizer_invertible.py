@@ -230,6 +230,14 @@ def transform_tokens(tokens):
         yield token
 
 
+def sanitize_token(token):
+    if '{' in token.value or '}' in token.value:
+        return Token(token.ttype, token.value.replace("{", "{{").replace("}", "}}"),
+                     token.start, token.end, token.line)
+    else:
+        return token
+
+
 def get_pyxl_token(start_token, tokens):
     ttype, tvalue, tstart, tend, tline = start_token
     pyxl_parser = PyxlParser(tstart.row, tstart.col)
@@ -274,7 +282,7 @@ def get_pyxl_token(start_token, tokens):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
             else:
-                pyxl_tokens.append(token)
+                pyxl_tokens.append(sanitize_token(token))
                 pyxl_parser.feed_comment(token)
                 continue
         elif tvalue and tvalue[0] == '#':
@@ -290,7 +298,7 @@ def get_pyxl_token(start_token, tokens):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
 
-        pyxl_tokens.append(token)
+        pyxl_tokens.append(sanitize_token(token))
         pyxl_parser.feed(token)
 
         if pyxl_parser.done(): break
@@ -306,6 +314,7 @@ def get_pyxl_token(start_token, tokens):
         tokens.rewind_and_retokenize(remainder)
         # Strip the remainder out from the last seen token
         if remainder.value:
+            assert '{' not in remainder.value and '}' not in remainder.value
             last = pyxl_tokens[-1]
             pyxl_tokens[-1] = Token(
                 last.ttype, last.value[:-len(remainder[1])],
@@ -482,7 +491,6 @@ def reverse_tokens(tokens):
                         for buf, orig_pos, real_pos
                         in zip(real_arg_buffers, orig_poses, real_poses)]
 
-                # XXX escaping {s??
                 fmt = ast.literal_eval(untokenize(fmt_buffer))
                 orig_start_col = int(untokenize(start_pos_buffer))
 
