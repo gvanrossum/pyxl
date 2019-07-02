@@ -479,19 +479,43 @@ def reverse_tokens(tokens):
                 fmt = ast.literal_eval(untokenize(fmt_buffer))
                 orig_start_col = int(untokenize(start_pos_buffer))
 
-                # print("CLOSED\n|{}|".format(fmt.format(*args)))
+                # If the pyxl literal has been moved off the line with html.PYXL
+                # and it has newlines in it, reparenthesize it and push it onto a newline
+                # This is a heuristic that interacts well with black but can insert
+                # redundant parens in some cases.
+                # TODO: do we need more of a heuristic for this?
+                initial_tok = None
+                pyxl_literal_start = first_non_ws_token(fmt_buffer)[2]
+                if pyxl_start[0] != pyxl_literal_start[0] and '\n' in fmt:
+                    reparenthesize = True
+                    new_start = pyxl_literal_start
+                else:
+                    reparenthesize = False
+                    new_start = pyxl_start
 
                 # format to get the raw pyxl
                 raw_pyxl = fmt.format(*args)
                 # and then try to repair its internal indentation if the start position shifted
-                fixed_pyxl = try_fixing_indent(raw_pyxl, pyxl_start[1] - orig_start_col)
+                fixed_pyxl = try_fixing_indent(raw_pyxl, new_start[1] - orig_start_col)
 
-                token = (tokenize.STRING, fixed_pyxl, pyxl_start, tend, '')
+                if reparenthesize:
+                    # Insert parentheses back around the formatted pyxl
+                    # We need to futz with tokens some to do this
+                    pyxl_literal_end = fmt_buffer[-1][3]
+                    if pyxl_literal_end[0] < token[2][0] - 1:
+                        pyxl_literal_end = (token[2][0] - 1, pyxl_literal_end[1])
+                    out_tokens = [
+                        (tokenize.OP, '(', pyxl_start, pyxl_start, ''),
+                        (tokenize.STRING, fixed_pyxl, pyxl_literal_start, pyxl_literal_end, ''),
+                        token,
+                    ]
+                else:
+                    out_tokens = [(tokenize.STRING, fixed_pyxl, pyxl_start, tend, '')]
 
                 if in_pyxl:
-                    current_buffer_stack[-1].append(token)
+                    current_buffer_stack[-1].extend(out_tokens)
                 else:
-                    yield token
+                    yield from out_tokens
                 continue
             if curly_depth < 0:
                 tokens.unshift(token)
