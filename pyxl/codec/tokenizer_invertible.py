@@ -229,11 +229,14 @@ def get_pyxl_token(start_token, tokens):
                 python_tokens = list(transform_tokens(tokens))
 
                 close_curly = next(tokens)
-                # seen.append(close_curly)
                 ttype, tvalue, tstart, tend, tline = close_curly
                 close_curly_sub = (ttype, '', tend, tend, tline)
 
-                seen.append((ttype, '{{{}}}', initial_tstart, tend, ''))
+                # Carefully split this up to preserve any whitespace at the edges
+                seen.append((ttype, '{{', initial_tstart, division, ''))
+                seen.append((ttype, '{}',
+                             first_non_ws_token(python_tokens)[2], python_tokens[-1][3], ''))
+                seen.append((ttype, '}}', tstart, tend, ''))
 
                 pyxl_parser.feed_python(python_tokens + [close_curly_sub])
                 python_stuff.append(python_tokens + [close_curly_sub])
@@ -388,7 +391,7 @@ def get_end_column(token):
     # ttype, tvalue, tstart, (tendrow, tendcol), tend, tline = token
     return token[3][1]
 
-def get_first_non_ws_token(tokens):
+def first_non_ws_token(tokens):
     for token in tokens:
         if token[0] not in (tokenize.INDENT,
                             tokenize.DEDENT,
@@ -463,7 +466,7 @@ def reverse_tokens(tokens):
                 real_arg_buffers = pos_and_arg_buffers[num_args:]
 
                 orig_poses = [int(untokenize(x)) for x in orig_pos_buffers]
-                real_poses = [get_start_column(get_first_non_ws_token(x))
+                real_poses = [get_start_column(first_non_ws_token(x))
                               for x in real_arg_buffers] # grab the columns...
                 # Shift the indentation position of all of the arguments to the columns
                 # they were at in the original source. (The final pyxl literal will then
