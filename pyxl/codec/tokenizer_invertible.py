@@ -281,15 +281,29 @@ def get_pyxl_token(start_token, tokens):
             last = seen[-1]
             seen[-1] = (last[0], last[1][:-len(remainder[1])], last[2], remainder[2], last[4])
 
-    output = "html.PYXL('''{}''', {}, {}{}{})".format(
+    output = "html.PYXL('''{}''', {}, {}, {}{}{})".format(
         Untokenizer().untokenize(seen).replace('\\', '\\\\').replace("'", "\\'"),
+        # Include the real compiled pyxl so that tools can see all the gritty details
+        untokenize([pyxl_parser.get_token()]),
+        # Include the start column so we can shift it if needed
         pyxl_parser.start[1],
-        ', '.join([str(get_start_column(x[0])) for x in python_stuff]), # grab the columns...
+        # Include the columns of each python fragment so we can shift them if needed
+        ', '.join([str(get_start_column(x[0])) for x in python_stuff]),
         ', ' if python_stuff else '',
-        ', '.join([Untokenizer().untokenize(x) for x in python_stuff]))
+        # When untokenizing python fragments, make sure to place them in their
+        # proper columns so that we don't detect a shift if there wasn't one.
+        ', '.join([untokenize_with_column(x) for x in python_stuff]))
     return (tokenize.STRING, output, pyxl_parser.start, pyxl_parser.end, '')
 
-    # return pyxl_parser.get_token()
+
+def untokenize_with_column(tokens):
+    """Untokenize a series of tokens, with it in its proper column.
+
+    This requires inserting a newline before it.
+    """
+    tok_type, token, start, end, line = tokens[0]
+    return Untokenizer(start[0] - 1, 0).untokenize(tokens)
+
 
 def cleanup_tokens(tokens):
     last_nw_token = None
@@ -442,7 +456,8 @@ def reverse_tokens(tokens):
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                pos_and_arg_buffers = arg_buffers[2:]
+                fmt_buffer, _, start_pos_buffer, *pos_and_arg_buffers = arg_buffers
+
                 num_args = len(pos_and_arg_buffers)//2
                 orig_pos_buffers = pos_and_arg_buffers[:num_args]
                 real_arg_buffers = pos_and_arg_buffers[num_args:]
@@ -458,9 +473,8 @@ def reverse_tokens(tokens):
                         in zip(real_arg_buffers, orig_poses, real_poses)]
 
                 # XXX escaping {s??
-                fmt_token = arg_buffers[0][0]
-                fmt = ast.literal_eval(untokenize(arg_buffers[0]))
-                orig_start_col = int(untokenize(arg_buffers[1]))
+                fmt = ast.literal_eval(untokenize(fmt_buffer))
+                orig_start_col = int(untokenize(start_pos_buffer))
 
                 # print("CLOSED\n|{}|".format(fmt.format(*args)))
 
@@ -480,7 +494,8 @@ def reverse_tokens(tokens):
                 tokens.unshift(token)
                 return
 
-        if in_pyxl and ttype == tokenize.OP and tvalue == ',' and curly_depth == start_depth[-1] + 1:
+        if (in_pyxl and ttype == tokenize.OP and tvalue == ','
+                and curly_depth == start_depth[-1] + 1):
             arg_buffers_stack[-1].append(current_buffer_stack[-1])
             current_buffer_stack[-1] = []
             continue
