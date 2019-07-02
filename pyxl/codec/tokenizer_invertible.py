@@ -213,15 +213,6 @@ def transform_tokens(tokens):
 
             # check for a line jump without a newline token
             if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
-
-                # tokenize also forgets \ continuations :(
-                prev_line = prev_tline.strip()
-                if prev_ttype != tokenize.COMMENT and prev_line and prev_line[-1] == '\\':
-                    start_pos = Pos(prev_row, prev_col)
-                    end_pos = Pos(prev_row, prev_col+1)
-                    yield (tokenize.STRING, ' \\', start_pos, end_pos, prev_tline)
-                    prev_col += 1
-
                 start_pos = Pos(prev_row, prev_col)
                 end_pos = Pos(prev_row, prev_col+1)
                 yield Token(tokenize.NL, '\n', start_pos, end_pos, prev_tline)
@@ -371,15 +362,6 @@ def cleanup_tokens(tokens):
 
             # check for a line jump without a newline token
             if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
-
-                # tokenize also forgets \ continuations :(
-                prev_line = prev_tline.strip()
-                if prev_ttype != tokenize.COMMENT and prev_line and prev_line[-1] == '\\':
-                    start_pos = Pos(prev_row, prev_col)
-                    end_pos = Pos(prev_row, prev_col+1)
-                    yield Token(tokenize.STRING, ' \\', start_pos, end_pos, prev_tline)
-                    prev_col += 1
-
                 start_pos = Pos(prev_row, prev_col)
                 end_pos = Pos(prev_row, prev_col+1)
                 yield Token(tokenize.NL, '\n', start_pos, end_pos, prev_tline)

@@ -445,6 +445,7 @@ def generate_tokens(readline):
                 elif initial in namechars:                 # ordinary name
                     yield (NAME, token, spos, epos, line)
                 elif initial == '\\':                      # continued stmt
+                    yield (OP, token, spos, epos, line)
                     continued = 1
                 else:
                     if initial in '([{':
