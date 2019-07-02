@@ -24,7 +24,7 @@ def get_end_pos(start_pos, tvalue):
             row += 1
         else:
             col += 1
-    return (row, col)
+    return Pos(row, col)
 
 
 class RewindableTokenStream(object):
@@ -267,7 +267,7 @@ def get_pyxl_token(start_token, tokens):
                 pyxl_tokens.append(Token(ttype, '{{', initial_tstart, division, ''))
                 pyxl_tokens.append(Token(ttype, '{}',
                                          first_non_ws_token(python_tokens).start,
-                                         python_tokens[-1].end, ''))
+                                         first_non_ws_token(reversed(python_tokens)).end, ''))
                 pyxl_tokens.append(Token(ttype, '}}', tstart, tend, ''))
 
                 pyxl_parser.feed_python(python_tokens + [close_curly_sub])
@@ -328,7 +328,7 @@ def get_pyxl_token(start_token, tokens):
         # Include the start column so we can shift it if needed
         pyxl_parser_start.col,
         # Include the columns of each python fragment so we can shift them if needed
-        ', '.join([str(x[0].start.col) for x in python_fragments]),
+        ', '.join([str(first_non_ws_token(x).start.col) for x in python_fragments]),
         ', ' if python_fragments else '',
         # When untokenizing python fragments, make sure to place them in their
         # proper columns so that we don't detect a shift if there wasn't one.
@@ -415,7 +415,7 @@ def first_non_ws_token(tokens):
                                tokenize.NEWLINE):
             return token
     # well... let's return *something*
-    return tokens[-1]
+    return tokens[0]
 
 
 def reverse_tokens(tokens):
