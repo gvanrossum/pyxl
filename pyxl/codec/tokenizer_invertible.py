@@ -120,38 +120,28 @@ def untokenize_with_column(tokens):
 
 
 def pyxl_untokenize(tokens):
-    parts = []
-    prev_row = 1
-    prev_col = 0
-
-    for token in tokens:
-        ttype, tvalue, tstart, tend, tline = token
-        row, col = tstart
-
-        assert row == prev_row, 'Unexpected jump in rows on line:%d: %s' % (row, tline)
-
-        # Add whitespace
-        col_offset = col - prev_col
-        assert col_offset >= 0
-        if col_offset > 0:
-            parts.append(" " * col_offset)
-
-        parts.append(tvalue)
-        prev_row, prev_col = tend
-
-        if ttype in (tokenize.NL, tokenize.NEWLINE):
-            prev_row += 1
-            prev_col = 0
-
-    return ''.join(parts)
+    return Untokenizer(1, 0).untokenize(tokens)
 
 
 def pyxl_tokenize(readline):
-    return transform_tokens(RewindableTokenStream(readline))
+    return cleanup_tokens(transform_tokens(RewindableTokenStream(readline)))
 
 
 def pyxl_reverse_tokenize(readline):
     return cleanup_tokens(reverse_tokens(RewindableTokenStream(readline)))
+
+
+def cleanup_tokens(tokens):
+    for token in tokens:
+        ttype, tvalue, tstart, tend, tline = token
+
+        # strip trailing newline from non newline tokens
+        if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
+            ltoken = list(token)
+            tvalue = ltoken[1] = tvalue[:-1]
+            token = Token(*ltoken)
+
+        yield token
 
 
 def transform_tokens(tokens):
@@ -196,26 +186,6 @@ def transform_tokens(tokens):
                          tokenize.NEWLINE,
                          tokenize.COMMENT):
             last_nw_token = token
-
-        # strip trailing newline from non newline tokens
-        if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
-            ltoken = list(token)
-            tvalue = ltoken[1] = tvalue[:-1]
-            token = tuple(ltoken)
-
-        # tokenize has this bug where you can get line jumps without a newline token
-        # we check and fix for that here by seeing if there was a line jump
-        if prev_token:
-            prev_ttype, prev_tvalue, prev_tstart, prev_tend, prev_tline = prev_token
-
-            prev_row, prev_col = prev_tend
-            cur_row, cur_col = tstart
-
-            # check for a line jump without a newline token
-            if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
-                start_pos = Pos(prev_row, prev_col)
-                end_pos = Pos(prev_row, prev_col+1)
-                yield Token(tokenize.NL, '\n', start_pos, end_pos, prev_tline)
 
         prev_token = token
         yield token
@@ -325,49 +295,6 @@ def get_pyxl_token(start_token, tokens):
         # proper columns so that we don't detect a shift if there wasn't one.
         ', '.join([untokenize_with_column(x) for x in python_fragments]))
     return Token(tokenize.STRING, output, pyxl_parser_start, Pos(*pyxl_parser.end), '')
-
-
-def cleanup_tokens(tokens):
-    last_nw_token = None
-    prev_token = None
-
-    while 1:
-        try:
-            token = next(tokens)
-        except (StopIteration, tokenize.TokenError):
-            break
-
-        ttype, tvalue, tstart, tend, tline = token
-
-        if ttype not in (tokenize.INDENT,
-                         tokenize.DEDENT,
-                         tokenize.NL,
-                         tokenize.NEWLINE,
-                         tokenize.COMMENT):
-            last_nw_token = token
-
-        # strip trailing newline from non newline tokens
-        if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
-            ltoken = list(token)
-            tvalue = ltoken[1] = tvalue[:-1]
-            token = Token(*ltoken)
-
-        # tokenize has this bug where you can get line jumps without a newline token
-        # we check and fix for that here by seeing if there was a line jump
-        if prev_token:
-            prev_ttype, prev_tvalue, prev_tstart, prev_tend, prev_tline = prev_token
-
-            prev_row, prev_col = prev_tend
-            cur_row, cur_col = tstart
-
-            # check for a line jump without a newline token
-            if (prev_row < cur_row and prev_ttype not in (tokenize.NEWLINE, tokenize.NL)):
-                start_pos = Pos(prev_row, prev_col)
-                end_pos = Pos(prev_row, prev_col+1)
-                yield Token(tokenize.NL, '\n', start_pos, end_pos, prev_tline)
-
-        prev_token = token
-        yield token
 
 
 def try_fixing_indent(s, diff):
