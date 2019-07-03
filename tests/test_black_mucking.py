@@ -3,31 +3,42 @@ import html
 class A:
     def foo():
         lol = (<test_thing
-                  test_something_whatever={{"initialsomething": initialsomething,
-                                            "thisisirritating": lurrrr,
+                  test_something_whatever={{"aaaaaaaaaaaaaaaa": aaaaaaaaaaaaaaaa,
+                                            "bbbbbbbbbbbbbbbb": lurrrr,
                                             "whatever": whatever,}}
-              />)
+               />)
 
+        # Unfortunately black doesn't understand the real column
+        # positions so does not wrap this
         foo = (<test_thing
                   test_something_whatever={["initialsomething",
-                                            "thisisirritating",
+                                            "bbbbbbbbbbbbbbbb",
                                             "whatever",
-                                            "more args",
-                  ]}
-              />)
+                                            "more args",]}
+               />)
 
         baz = (<test_thing
                   test_something_whatever={foo("initialsomething",
-                                               "thisisirritating",
+                                               "bbbbbbbbbbbbbbbb",
                                                "whatever",
                                                "more args",
                                                "again",
                                                "asdf",)}
-              />)
+               />)
 
         lol("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", <foo>
                                                             <bar />
                                                         </foo>)
+
+        a = (<testing>
+                hello {world}
+             </testing>)
+
+        b = (<testing>
+                 hello {{"initialsomething": initialsomething,
+                         "bbbbbbbbbbbbbbbb": lurrrr,
+                         "whatever": whatever,}} world
+             </testing>)
 
         return (
             <foo>
