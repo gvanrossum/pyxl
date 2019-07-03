@@ -1,14 +1,13 @@
 import os
 import pytest
 import tempfile
-import shutil
 
 from pyxl.codec.transform import pyxl_transform_string, pyxl_invert_string
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
 input_files = [
-    'test_black_mucking.py',
+    'test_black_input.py',
 ]
 
 def _black(file_name):
@@ -17,7 +16,7 @@ def _black(file_name):
 
     with open(path, "r", encoding='utf8') as f:
         contents = f.read()
-    with open(path + '.out', "r", encoding='utf8') as f:
+    with open(path + '.exp', "r", encoding='utf8') as f:
         expected_contents = f.read()
 
     # Run black on the file. We manually encode and decode ourselves
@@ -46,5 +45,4 @@ def test_black():
         pytest.skip()
 
     for file_name in input_files:
-        if file_name.endswith('.py'):
-            _black(file_name)
+        _black(file_name)
