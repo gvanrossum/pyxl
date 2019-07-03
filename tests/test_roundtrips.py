@@ -7,7 +7,7 @@ dir_path = os.path.dirname(os.path.abspath(__file__))
 
 def _roundtrip(file_name):
     path = os.path.join(dir_path, file_name)
-    with open(path, "r") as f:
+    with open(path, "r", encoding='utf8') as f:
         contents = f.read()
         depyxled = pyxl_transform_string(contents, invertible=True)
 

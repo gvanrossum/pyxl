@@ -1,9 +1,5 @@
 # coding: pyxl
 
-# I test interactions with black manually with
-# cp tests/test_black_mucking.py /tmp/out.py; black /tmp/out.py && cat /tmp/out.py
-# and spot checking the result to make sure I like it.
-
 import html
 class A:
     def foo():
