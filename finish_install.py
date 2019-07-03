@@ -5,6 +5,9 @@ from distutils.sysconfig import get_python_lib
 
 python_lib = get_python_lib()
 if len(sys.argv) > 1 and sys.argv[1] == '--invertible':
-    shutil.copy('pyxl_invertible.pth', os.path.join(python_lib, 'pyxl.pth'))
+    module = 'fast_register_invertible'
 else:
-    shutil.copy('pyxl.pth', python_lib)
+    module = 'fast_register'
+
+with open(os.path.join(python_lib, 'pyxl.pth'), 'w') as f:
+    f.write('import pyxl.codec.{}\n'.format(module))
