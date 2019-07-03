@@ -128,7 +128,7 @@ def pyxl_untokenize(tokens):
     return Untokenizer(1, 0).untokenize(tokens)
 
 
-def pyxl_tokenize(readline, invertible):
+def pyxl_tokenize(readline, invertible=False):
     return cleanup_tokens(transform_tokens(RewindableTokenStream(readline), invertible))
 
 

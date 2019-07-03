@@ -1,5 +1,5 @@
 from pyxl.codec.register import pyxl_decode
-from pyxl.codec.tokenizer_invertible import PyxlParseError
+from pyxl.codec.tokenizer import PyxlParseError
 from pyxl.codec.parser import ParseError
 
 import os

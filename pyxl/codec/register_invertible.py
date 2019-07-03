@@ -5,7 +5,7 @@ import codecs, io, encodings
 import sys
 import traceback
 from encodings import utf_8
-from pyxl.codec.tokenizer_invertible import (
+from pyxl.codec.tokenizer import (
     pyxl_reverse_tokenize, pyxl_tokenize, pyxl_untokenize,
     PyxlUnfinished,
 )
