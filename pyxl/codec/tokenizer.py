@@ -320,13 +320,21 @@ def get_pyxl_token(start_token, tokens, invertible):
         return fix_token(pyxl_parser.get_token())
 
 
-def try_fixing_indent(s, diff):
+def try_fixing_indent(s, diff, align_to=None):
     """Given a string, try to fix its internal indentation"""
-    if '\n' not in s:
+    if diff == 0 or '\n' not in s:
         return s
     lines = s.split('\n')
     if len(lines) < 2:
         return s
+
+    # If we are making a change, and we have an align_to specified,
+    # shift lines so that the last line is aligned with the first.
+    if align_to is not None:
+        leading_spaces = len(lines[-1]) - len(lines[-1].lstrip(" "))
+        internal_diff = align_to - leading_spaces
+        diff += internal_diff
+
     fixed = [lines[0]]
     spacing = " " * abs(diff)
     for line in lines[1:]:
@@ -430,7 +438,7 @@ def invert_tokens(tokens):
                 # and it has newlines in it, reparenthesize it and push it onto a newline
                 # This is a heuristic that interacts well with black but can insert
                 # redundant parens in some cases.
-                # TODO: do we need more of a heuristic for this?
+                # TODO: do we want a better heuristic for this?
                 initial_tok = None
                 pyxl_literal_start = first_non_ws_token(fmt_buffer).start
                 if pyxl_start.row != pyxl_literal_start.row and '\n' in fmt:
@@ -443,7 +451,8 @@ def invert_tokens(tokens):
                 # format to get the raw pyxl
                 raw_pyxl = fmt.format(*args)
                 # and then try to repair its internal indentation if the start position shifted
-                fixed_pyxl = try_fixing_indent(raw_pyxl, new_start[1] - orig_start_col)
+                fixed_pyxl = try_fixing_indent(raw_pyxl, new_start[1] - orig_start_col,
+                                               align_to=orig_start_col)
 
                 if reparenthesize:
                     # Insert parentheses back around the formatted pyxl
