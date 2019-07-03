@@ -1,6 +1,7 @@
 from pyxl.codec.transform import pyxl_transform_string, pyxl_invert_string
 
 import os
+import ast
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -9,6 +10,10 @@ def _roundtrip(file_name):
     with open(path, "r") as f:
         contents = f.read()
         depyxled = pyxl_transform_string(contents, invertible=True)
+
+        # Make sure the transformed string parses
+        ast.parse(depyxled)
+        # Verify that it round trips without change
         assert contents == pyxl_invert_string(depyxled), (
             "Could not round-trip file %s" % file_name)
 
