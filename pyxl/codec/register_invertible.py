@@ -12,7 +12,7 @@ from pyxl.codec.tokenizer_invertible import (
 
 def pyxl_transform(stream):
     try:
-        output = pyxl_untokenize(pyxl_tokenize(stream.readline))
+        output = pyxl_untokenize(pyxl_tokenize(stream.readline, invertible=True))
     except Exception as ex:
         print(ex)
         traceback.print_exc()

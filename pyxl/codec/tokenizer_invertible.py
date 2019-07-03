@@ -10,6 +10,11 @@ Pos = namedtuple('Pos', ['row', 'col'])
 Token = namedtuple('Token', ['ttype', 'value', 'start', 'end', 'line'])
 
 
+def fix_token(t):
+    ttype, value, start, end, line = t
+    return Token(ttype, value, Pos(*start), Pos(*end), line)
+
+
 class PyxlUnfinished(Exception): pass
 
 
@@ -123,8 +128,8 @@ def pyxl_untokenize(tokens):
     return Untokenizer(1, 0).untokenize(tokens)
 
 
-def pyxl_tokenize(readline):
-    return cleanup_tokens(transform_tokens(RewindableTokenStream(readline)))
+def pyxl_tokenize(readline, invertible):
+    return cleanup_tokens(transform_tokens(RewindableTokenStream(readline), invertible))
 
 
 def pyxl_reverse_tokenize(readline):
@@ -144,7 +149,7 @@ def cleanup_tokens(tokens):
         yield token
 
 
-def transform_tokens(tokens):
+def transform_tokens(tokens, invertible):
     last_nw_token = None
     prev_token = None
 
@@ -178,7 +183,7 @@ def transform_tokens(tokens):
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'else') or
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'yield') or
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'return'))):
-            token = get_pyxl_token(token, tokens)
+            token = get_pyxl_token(token, tokens, invertible)
 
         if ttype not in (tokenize.INDENT,
                          tokenize.DEDENT,
@@ -199,7 +204,7 @@ def sanitize_token(token):
         return token
 
 
-def get_pyxl_token(start_token, tokens):
+def get_pyxl_token(start_token, tokens, invertible):
     ttype, tvalue, tstart, tend, tline = start_token
     pyxl_parser = PyxlParser(tstart.row, tstart.col)
     pyxl_parser.feed(start_token)
@@ -218,7 +223,7 @@ def get_pyxl_token(start_token, tokens):
                 division = get_end_pos(tstart, mid)
                 pyxl_parser.feed_position_only(Token(ttype, mid, tstart, division, tline))
                 tokens.rewind_and_retokenize(Token(ttype, right, division, tend, tline))
-                python_tokens = list(transform_tokens(tokens))
+                python_tokens = list(transform_tokens(tokens, invertible))
 
                 close_curly = next(tokens)
                 ttype, tvalue, tstart, tend, tline = close_curly
@@ -271,7 +276,7 @@ def get_pyxl_token(start_token, tokens):
 
     remainder = pyxl_parser.get_remainder()
     if remainder:
-        remainder = Token(*remainder)
+        remainder = fix_token(remainder)
         tokens.rewind_and_retokenize(remainder)
         # Strip the remainder out from the last seen token
         if remainder.value:
@@ -279,22 +284,25 @@ def get_pyxl_token(start_token, tokens):
             last = pyxl_tokens[-1]
             pyxl_tokens[-1] = Token(
                 last.ttype, last.value[:-len(remainder[1])],
-                last.start, Pos(*remainder.start), last.line)
+                last.start, remainder.start, last.line)
 
     pyxl_parser_start = Pos(*pyxl_parser.start)
-    output = "html.PYXL('''{}''', {}, {}, {}{}{})".format(
-        untokenize(pyxl_tokens).replace('\\', '\\\\').replace("'", "\\'"),
-        # Include the real compiled pyxl so that tools can see all the gritty details
-        untokenize([pyxl_parser.get_token()]),
-        # Include the start column so we can shift it if needed
-        pyxl_parser_start.col,
-        # Include the columns of each python fragment so we can shift them if needed
-        ', '.join([str(first_non_ws_token(x).start.col) for x in python_fragments]),
-        ', ' if python_fragments else '',
-        # When untokenizing python fragments, make sure to place them in their
-        # proper columns so that we don't detect a shift if there wasn't one.
-        ', '.join([untokenize_with_column(x) for x in python_fragments]))
-    return Token(tokenize.STRING, output, pyxl_parser_start, Pos(*pyxl_parser.end), '')
+    if invertible:
+        output = "html.PYXL('''{}''', {}, {}, {}{}{})".format(
+            untokenize(pyxl_tokens).replace('\\', '\\\\').replace("'", "\\'"),
+            # Include the real compiled pyxl so that tools can see all the gritty details
+            untokenize([pyxl_parser.get_token()]),
+            # Include the start column so we can shift it if needed
+            pyxl_parser_start.col,
+            # Include the columns of each python fragment so we can shift them if needed
+            ', '.join([str(first_non_ws_token(x).start.col) for x in python_fragments]),
+            ', ' if python_fragments else '',
+            # When untokenizing python fragments, make sure to place them in their
+            # proper columns so that we don't detect a shift if there wasn't one.
+            ', '.join([untokenize_with_column(x) for x in python_fragments]))
+        return Token(tokenize.STRING, output, pyxl_parser_start, Pos(*pyxl_parser.end), '')
+    else:
+        return fix_token(pyxl_parser.get_token())
 
 
 def try_fixing_indent(s, diff):

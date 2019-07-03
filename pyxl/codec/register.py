@@ -5,11 +5,11 @@ import codecs, io, encodings
 import sys
 import traceback
 from encodings import utf_8
-from pyxl.codec.tokenizer import pyxl_tokenize, pyxl_untokenize
+from pyxl.codec.tokenizer_invertible import pyxl_tokenize, pyxl_untokenize
 
 def pyxl_transform(stream):
     try:
-        output = pyxl_untokenize(pyxl_tokenize(stream.readline))
+        output = pyxl_untokenize(pyxl_tokenize(stream.readline, invertible=False))
     except Exception as ex:
         print(ex)
         traceback.print_exc()
