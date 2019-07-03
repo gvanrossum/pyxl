@@ -240,17 +240,16 @@ def get_pyxl_token(start_token, tokens, invertible):
                     # If we are doing invertible generation, put in a format placeholder
                     # into the collected pyxl tokens and collect python fragment separately.
 
-                    # We wrap each fragment in brackets because relying on the commas
-                    # doesn't work when there are undelimited commas.
-                    # This also serves to bookend any internal whitespace in the fragment
-                    # so it can be extracted later.
-                    fake_open_bracket = Token(ttype, '[', initial_tstart, division, tline)
-                    fake_close_bracket = Token(ttype, ']', tstart, tend, tline)
+                    # We keep each fragment wrapped in the curlies it came in (because just
+                    # relying on the commas) doesn't work when there are undelimited commas.
+                    # This also serves to preserve any internal whitespace in the fragment so
+                    # it can be restored later.
+                    open_curly = Token(ttype, '{', initial_tstart, division, tline)
 
-                    pyxl_tokens.append(Token(ttype, '{{{}}}', initial_tstart, tend, ''))
+                    pyxl_tokens.append(Token(ttype, '{}', initial_tstart, tend, ''))
 
                     python_fragments.append(
-                        [fake_open_bracket] + python_tokens + [fake_close_bracket])
+                        [open_curly] + python_tokens + [close_curly])
 
                 continue
             # else fallthrough to pyxl_parser.feed(token)
@@ -351,15 +350,6 @@ def first_non_ws_token(tokens):
     return tokens[0]
 
 
-def strip_brackets(s):
-    assert s[0] == '['
-    assert s[-1] == ']'
-    i = s.find('[')
-    s = s[:i] + s[i+1:]
-    i = s.rfind(']')
-    return s[:i] + s[i+1:]
-
-
 def invert_tokens(tokens):
     saved_tokens = []
 
@@ -429,7 +419,7 @@ def invert_tokens(tokens):
                 # Shift the indentation position of all of the arguments to the columns
                 # they were at in the original source. (The final pyxl literal will then
                 # be shifted from its original column to its new column.)
-                args = [try_fixing_indent(strip_brackets(untokenize(buf)), orig_pos - real_pos)
+                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
                         for buf, orig_pos, real_pos
                         in zip(real_arg_buffers, orig_poses, real_poses)]
 

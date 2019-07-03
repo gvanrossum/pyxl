@@ -12,7 +12,10 @@ def _roundtrip(file_name):
         depyxled = pyxl_transform_string(contents, invertible=True)
 
         # Make sure the transformed string parses
-        ast.parse(depyxled)
+        try:
+            ast.parse(depyxled)
+        except Exception as e:
+            raise Exception("Parse error in file %s" % file_name)
         # Verify that it round trips without change
         assert contents == pyxl_invert_string(depyxled), (
             "Could not round-trip file %s" % file_name)
