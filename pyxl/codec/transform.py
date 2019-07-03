@@ -3,7 +3,7 @@ import sys
 import traceback
 from encodings import utf_8
 from pyxl.codec.tokenizer import (
-    pyxl_reverse_tokenize, pyxl_tokenize, pyxl_untokenize,
+    pyxl_invert_tokenize, pyxl_tokenize, pyxl_untokenize,
     PyxlUnfinished,
 )
 
@@ -18,9 +18,9 @@ def pyxl_transform(stream, invertible=False):
     return output
 
 
-def pyxl_reverse(stream):
+def pyxl_invert(stream):
     try:
-        output = pyxl_untokenize(pyxl_reverse_tokenize(stream.readline))
+        output = pyxl_untokenize(pyxl_invert_tokenize(stream.readline))
     except PyxlUnfinished:
         raise
     except Exception as ex:
@@ -36,16 +36,16 @@ def pyxl_transform_string(input, invertible=False):
     return pyxl_transform(stream, invertible)
 
 
-def pyxl_reverse_string(input):
+def pyxl_invert_string(input):
     stream = io.StringIO(input)
-    return pyxl_reverse(stream)
+    return pyxl_invert(stream)
 
 
 def pyxl_encode(input, errors='strict'):
     # FIXME: maybe we should actually be able to consume partial results
     # instead of this O(n^2) retry thing?
     try:
-        return pyxl_reverse_string(input.decode('utf-8')).encode('utf-8'), len(input)
+        return pyxl_invert_string(input.decode('utf-8')).encode('utf-8'), len(input)
     except PyxlUnfinished:
         return b'', 0
 

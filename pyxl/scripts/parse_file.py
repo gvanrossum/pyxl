@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from pyxl.codec.transform import pyxl_reverse_string, pyxl_transform_string
+from pyxl.codec.transform import pyxl_invert_string, pyxl_transform_string
 
 
 if __name__ == '__main__':
@@ -17,6 +17,6 @@ if __name__ == '__main__':
     with open(fname, 'r') as f:
         contents = f.read()
         if invert:
-            print(pyxl_reverse_string(contents), end='')
+            print(pyxl_invert_string(contents), end='')
         else:
             print(pyxl_transform_string(contents, invertible), end='')

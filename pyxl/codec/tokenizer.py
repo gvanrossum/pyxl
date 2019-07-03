@@ -132,8 +132,8 @@ def pyxl_tokenize(readline, invertible=False):
     return cleanup_tokens(transform_tokens(RewindableTokenStream(readline), invertible))
 
 
-def pyxl_reverse_tokenize(readline):
-    return cleanup_tokens(reverse_tokens(RewindableTokenStream(readline)))
+def pyxl_invert_tokenize(readline):
+    return cleanup_tokens(invert_tokens(RewindableTokenStream(readline)))
 
 
 def cleanup_tokens(tokens):
@@ -346,7 +346,7 @@ def strip_brackets(s):
     return s[:i] + s[i+1:]
 
 
-def reverse_tokens(tokens):
+def invert_tokens(tokens):
     saved_tokens = []
 
     curly_depth = 0

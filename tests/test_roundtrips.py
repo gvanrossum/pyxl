@@ -1,4 +1,4 @@
-from pyxl.codec.transform import pyxl_transform_string, pyxl_reverse_string
+from pyxl.codec.transform import pyxl_transform_string, pyxl_invert_string
 
 import os
 
@@ -9,7 +9,7 @@ def _roundtrip(file_name):
     with open(path, "r") as f:
         contents = f.read()
         depyxled = pyxl_transform_string(contents, invertible=True)
-        assert contents == pyxl_reverse_string(depyxled), (
+        assert contents == pyxl_invert_string(depyxled), (
             "Could not round-trip file %s" % file_name)
 
 # TODO: it would be better if each file was automatically a separate test case...

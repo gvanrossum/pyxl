@@ -1,4 +1,4 @@
-from pyxl.codec.register import pyxl_decode
+from pyxl.codec.transform import pyxl_transform_string
 from pyxl.codec.tokenizer import PyxlParseError
 from pyxl.codec.parser import ParseError
 
@@ -10,8 +10,8 @@ error_cases_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 def _expect_failure(file_name):
     path = os.path.join(error_cases_path, file_name)
     try:
-        with open(path, 'rb') as f:
-            print(pyxl_decode(f.read()))
+        with open(path, 'r') as f:
+            print(pyxl_transform_string(f.read()))
         assert False, "successfully decoded file %r" % file_name
     except (PyxlParseError, ParseError):
         pass

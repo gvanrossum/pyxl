@@ -5,7 +5,7 @@ def search_function(encoding):
     if encoding != 'pyxl': return None
 
     import encodings
-    from pyxl.codec.transform import pyxl_decode, PyxlIncrementalDecoder PyxlStreamReader
+    from pyxl.codec.transform import pyxl_decode, PyxlIncrementalDecoder, PyxlStreamReader
 
     # Assume utf8 encoding
     utf8=encodings.search_function('utf8')
