@@ -21,7 +21,7 @@ def _roundtrip(file_name):
             "Could not round-trip file %s" % file_name)
 
 # TODO: it would be better if each file was automatically a separate test case...
-def test_error_cases():
+def test_roundtrips():
     cases = os.listdir(dir_path)
     for file_name in cases:
         if file_name.endswith('.py'):
