@@ -143,7 +143,7 @@ def cleanup_tokens(tokens):
         # strip trailing newline from non newline tokens
         if tvalue and tvalue[-1] == '\n' and ttype not in (tokenize.NL, tokenize.NEWLINE):
             ltoken = list(token)
-            tvalue = ltoken[1] = tvalue[:-1]
+            ltoken[1] = tvalue[:-1]
             token = Token(*ltoken)
 
         yield token
@@ -197,6 +197,7 @@ def transform_tokens(tokens, invertible):
 
 
 def sanitize_token(token):
+    """Escape brackets in a token that is going to be put in a format string"""
     if '{' in token.value or '}' in token.value:
         return Token(token.ttype, token.value.replace("{", "{{").replace("}", "}}"),
                      token.start, token.end, token.line)
@@ -209,8 +210,12 @@ def get_pyxl_token(start_token, tokens, invertible):
     pyxl_parser = PyxlParser(tstart.row, tstart.col)
     pyxl_parser.feed(start_token)
 
-    pyxl_tokens = [start_token]
-    python_fragments = []
+    if invertible:
+        # In invertible mode, keep track of all the tokens we see in pyxl and
+        # each python fragment that appears
+        pyxl_tokens = [start_token]
+        python_fragments = []
+
     for token in tokens:
         ttype, tvalue, tstart, tend, tline = token
 
@@ -229,17 +234,24 @@ def get_pyxl_token(start_token, tokens, invertible):
                 ttype, tvalue, tstart, tend, tline = close_curly
                 close_curly_sub = Token(ttype, '', tend, tend, tline)
 
-                # We wrap each fragment in brackets because relying on the commas
-                # doesn't work when there are undelimited commas.
-                # This also serves to bookend any internal whitespace in the fragment
-                # so it can be extracted later.
-                fake_open_bracket = Token(ttype, '[', initial_tstart, division, tline)
-                fake_close_bracket = Token(ttype, ']', tstart, tend, tline)
-
-                pyxl_tokens.append(Token(ttype, '{{{}}}', initial_tstart, tend, ''))
-
                 pyxl_parser.feed_python(python_tokens + [close_curly_sub])
-                python_fragments.append([fake_open_bracket] + python_tokens + [fake_close_bracket])
+
+                if invertible:
+                    # If we are doing invertible generation, put in a format placeholder
+                    # into the collected pyxl tokens and collect python fragment separately.
+
+                    # We wrap each fragment in brackets because relying on the commas
+                    # doesn't work when there are undelimited commas.
+                    # This also serves to bookend any internal whitespace in the fragment
+                    # so it can be extracted later.
+                    fake_open_bracket = Token(ttype, '[', initial_tstart, division, tline)
+                    fake_close_bracket = Token(ttype, ']', tstart, tend, tline)
+
+                    pyxl_tokens.append(Token(ttype, '{{{}}}', initial_tstart, tend, ''))
+
+                    python_fragments.append(
+                        [fake_open_bracket] + python_tokens + [fake_close_bracket])
+
                 continue
             # else fallthrough to pyxl_parser.feed(token)
         elif tvalue and ttype == tokenize.COMMENT:
@@ -250,8 +262,9 @@ def get_pyxl_token(start_token, tokens, invertible):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
             else:
-                pyxl_tokens.append(sanitize_token(token))
                 pyxl_parser.feed_comment(token)
+                if invertible:
+                    pyxl_tokens.append(sanitize_token(token))
                 continue
         elif tvalue and tvalue[0] == '#':
             # let the python tokenizer grab the whole comment token
@@ -266,8 +279,9 @@ def get_pyxl_token(start_token, tokens, invertible):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
 
-        pyxl_tokens.append(sanitize_token(token))
         pyxl_parser.feed(token)
+        if invertible:
+            pyxl_tokens.append(sanitize_token(token))
 
         if pyxl_parser.done(): break
 
@@ -281,7 +295,7 @@ def get_pyxl_token(start_token, tokens, invertible):
         remainder = fix_token(remainder)
         tokens.rewind_and_retokenize(remainder)
         # Strip the remainder out from the last seen token
-        if remainder.value:
+        if invertible and remainder.value:
             assert '{' not in remainder.value and '}' not in remainder.value
             last = pyxl_tokens[-1]
             pyxl_tokens[-1] = Token(

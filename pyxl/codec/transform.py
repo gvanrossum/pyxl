@@ -45,7 +45,7 @@ def pyxl_encode(input, errors='strict'):
     # FIXME: maybe we should actually be able to consume partial results
     # instead of this O(n^2) retry thing?
     try:
-        return pyxl_invert_string(input.decode('utf-8')).encode('utf-8'), len(input)
+        return pyxl_invert_string(input).encode('utf-8'), len(input)
     except PyxlUnfinished:
         return b'', 0
 
