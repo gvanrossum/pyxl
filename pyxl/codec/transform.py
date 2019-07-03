@@ -51,7 +51,7 @@ def pyxl_encode(input, errors='strict'):
 
 
 def pyxl_decode(input, errors='strict', invertible=False):
-    return pyxl_transform_string(input.decode('utf-8'), invertible), len(input)
+    return pyxl_transform_string(bytes(input).decode('utf-8'), invertible), len(input)
 
 
 class PyxlIncrementalDecoder(codecs.BufferedIncrementalDecoder):
