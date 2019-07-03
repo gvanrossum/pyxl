@@ -474,7 +474,8 @@ def invert_tokens(tokens):
             current_buffer_stack[-1] = []
             continue
         elif in_pyxl:
-            current_buffer_stack[-1].append(token)
+            if token.ttype != tokenize.COMMENT:
+                current_buffer_stack[-1].append(token)
             continue
 
         prev_token = token
