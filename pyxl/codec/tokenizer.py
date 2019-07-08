@@ -111,8 +111,8 @@ class RewindableTokenStream(object):
         self.unshift_buffer[:0] = [token]
 
 
-def untokenize(toks, fix_comment=False):
-    return Untokenizer().untokenize(toks).lstrip()
+def untokenize(toks):
+    return Untokenizer().untokenize(toks).lstrip().rstrip(' ')
 
 
 def untokenize_with_column(tokens):
@@ -315,11 +315,15 @@ def get_pyxl_token(start_token, tokens, invertible):
             # Include the start column so we can shift it if needed
             pyxl_parser_start.col,
             # Include the columns of each python fragment so we can shift them if needed
-            ', '.join([str(first_non_ws_token(x).start.col) for x in python_fragments]),
-            ', ' if python_fragments else '',
+            ''.join([str(first_non_ws_token(x).start.col) + ', ' for x in python_fragments]),
             # When untokenizing python fragments, make sure to place them in their
             # proper columns so that we don't detect a shift if there wasn't one.
-            ', '.join([untokenize_with_column(x) for x in python_fragments]))
+            ''.join([untokenize_with_column(x) + ', ' for x in python_fragments]),
+            # Stick a final argument at the end so that all the real arguments are
+            # always terminated by commas (and don't pick up spurious whitespace
+            # with certain black formatting modes)
+            '0',
+        )
         return Token(tokenize.STRING, output, pyxl_parser_start, Pos(*pyxl_parser.end), '')
     else:
         return fix_token(pyxl_parser.get_token())
@@ -424,7 +428,7 @@ def invert_tokens(tokens):
                 current_buffer_stack.pop()
                 start_depth.pop()
 
-                fmt_buffer, _, start_pos_buffer, *pos_and_arg_buffers = arg_buffers
+                fmt_buffer, _, start_pos_buffer, *pos_and_arg_buffers, dummy_zero = arg_buffers
 
                 num_args = len(pos_and_arg_buffers)//2
                 orig_pos_buffers = pos_and_arg_buffers[:num_args]
@@ -436,7 +440,7 @@ def invert_tokens(tokens):
                 # Shift the indentation position of all of the arguments to the columns
                 # they were at in the original source. (The final pyxl literal will then
                 # be shifted from its original column to its new column.)
-                args = [try_fixing_indent(untokenize(buf, fix_comment=True), orig_pos - real_pos)
+                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
                         for buf, orig_pos, real_pos
                         in zip(real_arg_buffers, orig_poses, real_poses)]
 

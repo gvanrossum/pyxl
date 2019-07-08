@@ -58,6 +58,8 @@ class A:
         c = <frag>{0#lol
 }</frag>
 
+        placeholder_html = <div id={element_id} />.to_string()
+
         return (
             <foo>
                 <bar baz="{baz}" spam="{spam}" eggs="{eggs}" />
