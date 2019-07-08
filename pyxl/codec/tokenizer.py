@@ -111,8 +111,8 @@ class RewindableTokenStream(object):
         self.unshift_buffer[:0] = [token]
 
 
-def untokenize(toks):
-    return Untokenizer().untokenize(toks).strip()
+def untokenize(toks, fix_comment=False):
+    return Untokenizer().untokenize(toks).lstrip()
 
 
 def untokenize_with_column(tokens):
@@ -234,7 +234,10 @@ def get_pyxl_token(start_token, tokens, invertible):
                 ttype, tvalue, tstart, tend, tline = close_curly
                 close_curly_sub = Token(ttype, '', tend, tend, tline)
 
-                pyxl_parser.feed_python(python_tokens + [close_curly_sub])
+                # strip comments in the invertible version
+                pyxl_parser.feed_python(
+                    (strip_comments(python_tokens) if invertible else python_tokens)
+                    + [close_curly_sub])
 
                 if invertible:
                     # If we are doing invertible generation, put in a format placeholder
@@ -261,7 +264,9 @@ def get_pyxl_token(start_token, tokens, invertible):
                 token = Token(ttype, tvalue, tstart, division, tline)
                 # fallthrough to pyxl_parser.feed(token)
             else:
-                pyxl_parser.feed_comment(token)
+                # strip comments in the invertible version
+                if not invertible:
+                    pyxl_parser.feed_comment(token)
                 if invertible:
                     pyxl_tokens.append(sanitize_token(token))
                 continue
@@ -358,6 +363,10 @@ def first_non_ws_token(tokens):
     return tokens[0]
 
 
+def strip_comments(tokens):
+    return [tok for tok in tokens if tok.ttype != tokenize.COMMENT]
+
+
 def invert_tokens(tokens):
     saved_tokens = []
 
@@ -421,18 +430,18 @@ def invert_tokens(tokens):
                 orig_pos_buffers = pos_and_arg_buffers[:num_args]
                 real_arg_buffers = pos_and_arg_buffers[num_args:]
 
-                orig_poses = [int(untokenize(x)) for x in orig_pos_buffers]
-                real_poses = [first_non_ws_token(x).start.col
+                orig_poses = [int(untokenize(strip_comments(x))) for x in orig_pos_buffers]
+                real_poses = [first_non_ws_token(strip_comments(x)).start.col
                               for x in real_arg_buffers] # grab the columns...
                 # Shift the indentation position of all of the arguments to the columns
                 # they were at in the original source. (The final pyxl literal will then
                 # be shifted from its original column to its new column.)
-                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
+                args = [try_fixing_indent(untokenize(buf, fix_comment=True), orig_pos - real_pos)
                         for buf, orig_pos, real_pos
                         in zip(real_arg_buffers, orig_poses, real_poses)]
 
-                fmt = ast.literal_eval(untokenize(fmt_buffer))
-                orig_start_col = int(untokenize(start_pos_buffer))
+                fmt = ast.literal_eval(untokenize(strip_comments(fmt_buffer)))
+                orig_start_col = int(untokenize(strip_comments(start_pos_buffer)))
 
                 # If the pyxl literal has been moved off the line with html.PYXL
                 # and it has newlines in it, reparenthesize it and push it onto a newline
@@ -483,8 +492,7 @@ def invert_tokens(tokens):
             current_buffer_stack[-1] = []
             continue
         elif in_pyxl:
-            if token.ttype != tokenize.COMMENT:
-                current_buffer_stack[-1].append(token)
+            current_buffer_stack[-1].append(token)
             continue
 
         prev_token = token

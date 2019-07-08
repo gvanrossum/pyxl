@@ -51,7 +51,7 @@ class A:
 
         a = (
             <testing>
-               hello {world}
+                hello {world}
             </testing>
         )
 
@@ -72,6 +72,25 @@ class A:
                 this is very popular...
             </frag>
         )
+
+        a = (
+            <frag>Im cool # lol
+</frag>
+        )
+        bc = (
+            <frag>
+                {0}
+                # lol
+                {
+                    {
+                        "aaaaaaaaaaaaaaaa": aaaaaaaaaaaaaaaa,
+                        "bbbbbbbbbbbbbbbb": lurrrr,
+                        "whatever": whatever,
+                    }
+                }
+            </frag>
+        )
+        c = <frag>{0}</frag>  # lol
 
         return (
             <foo>

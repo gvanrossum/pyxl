@@ -32,7 +32,7 @@ class A:
                                                         </foo>)
 
         a = (<testing>
-                hello {world}
+                 hello {world}
              </testing>)
 
         b = (<testing>
@@ -44,6 +44,19 @@ class A:
         indented_annoyingly = <frag>
             this is very popular...
         </frag>
+
+        a = <frag>Im cool # lol
+</frag>
+        bc = <frag>
+            {
+                0 #lol
+            }
+            {{"aaaaaaaaaaaaaaaa": aaaaaaaaaaaaaaaa,
+              "bbbbbbbbbbbbbbbb": lurrrr,
+              "whatever": whatever,}}
+        </frag>
+        c = <frag>{0#lol
+}</frag>
 
         return (
             <foo>
