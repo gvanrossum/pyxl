@@ -22,7 +22,7 @@ def _roundtrip(file_name):
 
 # TODO: it would be better if each file was automatically a separate test case...
 def test_roundtrips():
-    cases = os.listdir(dir_path)
+    cases = sorted(os.listdir(dir_path))
     for file_name in cases:
         if file_name.endswith('.py'):
             _roundtrip(file_name)

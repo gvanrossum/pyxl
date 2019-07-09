@@ -329,7 +329,7 @@ def get_pyxl_token(start_token, tokens, invertible):
         return fix_token(pyxl_parser.get_token())
 
 
-def try_fixing_indent(s, diff, align_to=None):
+def try_fixing_indent(s, diff, align_to=None, first_lines=0):
     """Given a string, try to fix its internal indentation"""
     if diff == 0 or '\n' not in s:
         return s
@@ -337,19 +337,24 @@ def try_fixing_indent(s, diff, align_to=None):
     if len(lines) < 2:
         return s
 
+    internal_diff = 0
     # If we are making a change, and we have an align_to specified,
     # shift lines so that the last line is aligned with the first.
     if align_to is not None:
-        leading_spaces = len(lines[-1]) - len(lines[-1].lstrip(" "))
-        internal_diff = align_to - leading_spaces
-        diff += internal_diff
+        wo_space = lines[-1].lstrip(" ")
+        leading_spaces = len(lines[-1]) - len(wo_space)
+        if wo_space and wo_space[0] == '<':
+            internal_diff = align_to - leading_spaces
 
     fixed = [lines[0]]
-    spacing = " " * abs(diff)
-    for line in lines[1:]:
-        if diff > 0 and line:
+    early_spacing = " " * abs(diff), diff
+    late_spacing =  " " * abs(diff + internal_diff), diff + internal_diff
+    for i, line in enumerate(lines[1:]):
+        spacing, cdiff = late_spacing if i + 1 >= first_lines else early_spacing
+
+        if cdiff > 0 and line:
             line = spacing + line
-        elif diff < 0 and line.startswith(spacing):
+        elif cdiff < 0 and line.startswith(spacing):
             line = line[len(spacing):]
         fixed.append(line)
 
@@ -437,35 +442,39 @@ def invert_tokens(tokens):
                 orig_poses = [int(untokenize(strip_comments(x))) for x in orig_pos_buffers]
                 real_poses = [first_non_ws_token(strip_comments(x)).start.col
                               for x in real_arg_buffers] # grab the columns...
-                # Shift the indentation position of all of the arguments to the columns
-                # they were at in the original source. (The final pyxl literal will then
-                # be shifted from its original column to its new column.)
-                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
-                        for buf, orig_pos, real_pos
-                        in zip(real_arg_buffers, orig_poses, real_poses)]
-
                 fmt = ast.literal_eval(untokenize(strip_comments(fmt_buffer)))
                 orig_start_col = int(untokenize(strip_comments(start_pos_buffer)))
 
                 # If the pyxl literal has been moved off the line with html.PYXL
-                # and it has newlines in it, reparenthesize it and push it onto a newline
-                # This is a heuristic that interacts well with black but can insert
-                # redundant parens in some cases.
-                # TODO: do we want a better heuristic for this?
+                # has newlines in it, and we are not inside any nesting structures,
+                # reparenthesize it and push it onto a newline.
+                # This produces much better looking code.
                 initial_tok = None
                 pyxl_literal_start = first_non_ws_token(fmt_buffer).start
-                if pyxl_start.row != pyxl_literal_start.row and '\n' in fmt:
+
+                if curly_depth == 0 and pyxl_start.row != pyxl_literal_start.row and '\n' in fmt:
                     reparenthesize = True
                     new_start = pyxl_literal_start
                 else:
                     reparenthesize = False
                     new_start = pyxl_start
 
+                # Shift the indentation position of all of the arguments to the columns
+                # they were at in the original source. (The final pyxl literal will then
+                # be shifted from its original column to its new column.)
+                diff = new_start[1] - orig_start_col
+                args = [try_fixing_indent(untokenize(buf), orig_pos - real_pos)
+                        for buf, orig_pos, real_pos
+                        in zip(real_arg_buffers, orig_poses, real_poses)]
+
                 # format to get the raw pyxl
                 raw_pyxl = fmt.format(*args)
+                # count the number of lines produced by the *first* line of the format
+                # string, since we skip aligning those with the final
+                first_lines = fmt.split('\n')[0].format(*args).count('\n') + 1
                 # and then try to repair its internal indentation if the start position shifted
                 fixed_pyxl = try_fixing_indent(raw_pyxl, new_start[1] - orig_start_col,
-                                               align_to=orig_start_col)
+                                               align_to=orig_start_col, first_lines=first_lines)
 
                 if reparenthesize:
                     # Insert parentheses back around the formatted pyxl
@@ -479,7 +488,7 @@ def invert_tokens(tokens):
                         token,
                     ]
                 else:
-                    out_tokens = [Token(tokenize.STRING, fixed_pyxl, pyxl_start, tend, '')]
+                    out_tokens = [Token(tokenize.STRING, fixed_pyxl, new_start, tend, '')]
 
                 if in_pyxl:
                     current_buffer_stack[-1].extend(out_tokens)

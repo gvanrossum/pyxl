@@ -65,3 +65,17 @@ class A:
                 <bar baz="{baz}" spam="{spam}" eggs="{eggs}" />
             </foo>
         )
+
+class B:
+    def foo():
+        text = (<t fill="{dict(lol_name=self.lol.name, something=0000000000000000000000, testing='i hate pyxl')}">
+        </t>)
+
+        return (<div class="something">
+            {make_table((
+                ("asdf", "lol"),
+                ("welp", something),
+                ("wrap", blah.blah.blah.blah.blah.blah),
+
+            ))}
+        </div>)

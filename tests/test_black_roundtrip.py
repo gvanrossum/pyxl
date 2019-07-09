@@ -9,18 +9,27 @@ from pyxl.codec.transform import pyxl_transform_string, pyxl_invert_string
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
+def _run_black(contents):
+    import black
+
+    # Run black on the file. We manually encode and decode ourselves
+    # to avoid needing to make black find the right codec.
+    mode = black.FileMode()
+    return pyxl_invert_string(
+        black.format_str(pyxl_transform_string(contents, invertible=True), mode=mode)
+    )
+
 def _black_roundtrip(path):
     import black
 
     with open(path, "r", encoding='utf8') as f:
         contents = f.read()
 
-    # Run black on the file. We manually encode and decode ourselves
-    # to avoid needing to make black find the right codec.
-    mode = black.FileMode()
-    output = pyxl_invert_string(
-        black.format_str(pyxl_transform_string(contents, invertible=True), mode=mode)
-    )
+    output = _run_black(contents)
+    again = _run_black(output)
+
+    assert output == again, (
+        "Black not idempotent on file %s" % path)
 
     # Now we decode both versions with the traditional codec and compare.
     orig_pyxl = pyxl_transform_string(contents, invertible=False)
@@ -35,7 +44,7 @@ def test_black_commute():
     except ImportError:
         pytest.skip()
 
-    cases = os.listdir(dir_path)
+    cases = sorted(os.listdir(dir_path))
     for file_name in cases:
         if file_name.endswith('.py'):
             _black_roundtrip(os.path.join(dir_path, file_name))
