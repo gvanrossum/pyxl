@@ -105,7 +105,12 @@ class PyxlParser(HTMLTokenizer):
         if self.state in [State.DATA, State.CDATA_SECTION]:
             self.next_thing_is_python = True
             self.emit_data()
-            self.output.append("%s, " % Untokenizer().untokenize(tokens))
+            output = Untokenizer().untokenize(tokens)
+            # If we have a generator comprehension, parenthesize it
+            if has_bare_generator(tokens):
+                self.output.append("(%s), " % output)
+            else:
+                self.output.append("%s, " % output)
             self.next_thing_is_python = False
             self.last_thing_was_python = True
             self.start_element()
@@ -354,3 +359,16 @@ class PyxlParser(HTMLTokenizer):
         self.handle_startendtag("html_marked_decl", {"decl": ['CDATA[' + data]})
         self.last_thing_was_python = False
         self.last_thing_was_close_if_tag = False
+
+
+def has_bare_generator(tokens):
+    nesting = 0
+    for token in tokens:
+        tvalue = token[1]
+        if tvalue in "({[":
+            nesting += 1
+        if tvalue in ")}]":
+            nesting -= 1
+        if tvalue == "for" and nesting == 0:
+            return True
+    return False
