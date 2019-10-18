@@ -79,3 +79,10 @@ class B:
 
             ))}
         </div>)
+
+    def bar(self):
+        return (
+            <something
+                class="foo"
+            />  # type: ignore[arg-type]
+        )

@@ -308,6 +308,19 @@ def get_pyxl_token(start_token, tokens, invertible):
 
     pyxl_parser_start = Pos(*pyxl_parser.start)
     if invertible:
+        # We want to try to a trailing comment after a pyxl close in
+        # the pyxl block itself to prevent black from migrating it.
+        # (which matters a lot if it is a type: ignore.)
+        try:
+            peek = fix_token(next(tokens))
+        except StopIteration:
+            pass
+        else:
+            if peek.ttype == tokenize.COMMENT:
+                pyxl_tokens.append(peek)
+            else:
+                tokens.unshift(peek)
+
         output = "html.PYXL('''{}''', {}, {}, {}{}{})".format(
             untokenize(pyxl_tokens).replace('\\', '\\\\').replace("'", "\\'"),
             # Include the real compiled pyxl so that tools can see all the gritty details

@@ -259,6 +259,8 @@ class Untokenizer:
         tok_type, token, start, end, line = t
         if (self.prev_row is None):
             self.prev_row, self.prev_col = start
+        if tok_type in (NEWLINE, NL):
+            self.prev_col = end[1]
         self.add_whitespace(start)
         self.tokens.append(token)
         self.prev_row, self.prev_col = end
