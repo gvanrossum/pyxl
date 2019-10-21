@@ -308,7 +308,7 @@ def get_pyxl_token(start_token, tokens, invertible):
 
     pyxl_parser_start = Pos(*pyxl_parser.start)
     if invertible:
-        # We want to try to a trailing comment after a pyxl close in
+        # We want to include a trailing comment after a pyxl close in
         # the pyxl block itself to prevent black from migrating it.
         # (which matters a lot if it is a type: ignore.)
         try:
