@@ -128,8 +128,8 @@ def pyxl_untokenize(tokens):
     return Untokenizer(1, 0).untokenize(tokens)
 
 
-def pyxl_tokenize(readline, invertible=False):
-    return cleanup_tokens(transform_tokens(RewindableTokenStream(readline), invertible))
+def pyxl_tokenize(readline, invertible=False, str_function='str'):
+    return cleanup_tokens(transform_tokens(RewindableTokenStream(readline), invertible, str_function))
 
 
 def pyxl_invert_tokenize(readline):
@@ -149,7 +149,7 @@ def cleanup_tokens(tokens):
         yield token
 
 
-def transform_tokens(tokens, invertible):
+def transform_tokens(tokens, invertible, str_function):
     last_nw_token = None
     prev_token = None
 
@@ -183,7 +183,7 @@ def transform_tokens(tokens, invertible):
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'else') or
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'yield') or
              (last_nw_token[0] == tokenize.NAME and last_nw_token[1] == 'return'))):
-            token = get_pyxl_token(token, tokens, invertible)
+            token = get_pyxl_token(token, tokens, invertible, str_function)
 
         if ttype not in (tokenize.INDENT,
                          tokenize.DEDENT,
@@ -205,9 +205,9 @@ def sanitize_token(token):
         return token
 
 
-def get_pyxl_token(start_token, tokens, invertible):
+def get_pyxl_token(start_token, tokens, invertible, str_function):
     ttype, tvalue, tstart, tend, tline = start_token
-    pyxl_parser = PyxlParser(tstart.row, tstart.col)
+    pyxl_parser = PyxlParser(tstart.row, tstart.col, str_function)
     pyxl_parser.feed(start_token)
 
     if invertible:
@@ -228,7 +228,7 @@ def get_pyxl_token(start_token, tokens, invertible):
                 division = get_end_pos(tstart, mid)
                 pyxl_parser.feed_position_only(Token(ttype, mid, tstart, division, tline))
                 tokens.rewind_and_retokenize(Token(ttype, right, division, tend, tline))
-                python_tokens = list(transform_tokens(tokens, invertible))
+                python_tokens = list(transform_tokens(tokens, invertible, str_function))
 
                 close_curly = next(tokens)
                 ttype, tvalue, tstart, tend, tline = close_curly
