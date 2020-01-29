@@ -7,9 +7,9 @@ from pyxl.codec.tokenizer import (
     PyxlUnfinished,
 )
 
-def pyxl_transform(stream, invertible=False):
+def pyxl_transform(stream, invertible=False, str_function='str'):
     try:
-        output = pyxl_untokenize(pyxl_tokenize(stream.readline, invertible))
+        output = pyxl_untokenize(pyxl_tokenize(stream.readline, invertible, str_function))
     except Exception as ex:
         print(ex)
         traceback.print_exc()
@@ -31,9 +31,9 @@ def pyxl_invert(stream):
     return output
 
 
-def pyxl_transform_string(input, invertible=False):
+def pyxl_transform_string(input, invertible=False, str_function='str'):
     stream = io.StringIO(input)
-    return pyxl_transform(stream, invertible)
+    return pyxl_transform(stream, invertible, str_function)
 
 
 def pyxl_invert_string(input):
